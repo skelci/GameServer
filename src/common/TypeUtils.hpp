@@ -17,6 +17,8 @@ struct Message {
 
 double getCurrentTimestamp();
 
+unsigned randint(unsigned min, unsigned max);
+
 std::string generateSalt();
 std::string hashString(const std::string& str, const std::string& salt);
 

@@ -10,29 +10,30 @@
 
 void handleMessageContent(std::string message) {
     std::string action = TypeUtils::getFirstParam(message);
+    std::string data = TypeUtils::getFirstParam(message);
 
     if (action == "SETTING_SET_dbConnString") {
-        settings.dbConnString = message;
+        settings.dbConnString = data;
         allSettingsReceivedArray[0] = true;
 
     } else if (action == "SETTING_SET_port") {
-        settings.port = std::stoi(message);
+        settings.port = std::stoi(data);
         allSettingsReceivedArray[1] = true;
 
     } else if (action == "SETTING_SET_emailVerificationsAttempts") {
-        settings.emailVerificationsAttempts = std::stoi(message);
+        settings.emailVerificationsAttempts = std::stoi(data);
         allSettingsReceivedArray[2] = true;
 
     } else if (action == "SETTING_SET_loginAttempts") {
-        settings.loginAttempts = std::stoi(message);
+        settings.loginAttempts = std::stoi(data);
         allSettingsReceivedArray[3] = true;
 
     } else if (action == "SETTING_SET_loginTime") {
-        settings.loginTime = std::stoi(message);
+        settings.loginTime = std::stoi(data);
         allSettingsReceivedArray[4] = true;
 
     } else if (action == "SETTING_SET_emailVerificationTime") {
-        settings.emailVerificationTime = std::stoi(message);
+        settings.emailVerificationTime = std::stoi(data);
         allSettingsReceivedArray[5] = true;
 
     } else if (action == "SHUTTING_DOWN") {

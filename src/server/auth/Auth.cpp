@@ -13,7 +13,6 @@ std::mutex Auth::mainMutex;
 void Auth::Init() {
     std::lock_guard<std::mutex> lock(mainMutex);
 
-    std::string connString = settings.dbConnString;
     c = std::make_unique<pqxx::connection>(settings.dbConnString);
     if (!c.load()->is_open()) {
         throw std::runtime_error("Failed to open database connection");
@@ -25,7 +24,7 @@ void Auth::Init() {
         "uid SERIAL PRIMARY KEY, "
         "username VARCHAR(255) NOT NULL, "
         "email VARCHAR(255) NOT NULL, "
-        "createdAt DOUBLE PRECISION NOT NULL"
+        "createdAt DOUBLE PRECISION NOT NULL, "
         "passwordHash VARCHAR(255) NOT NULL, "
         "passwordSalt VARCHAR(255) NOT NULL, "
         "reloginTokenHash VARCHAR(255), "

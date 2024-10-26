@@ -44,7 +44,8 @@ public:
     template<typename... Args>
     static void SendData(SOCKET socket, const Args&... args);
     
-    static short SendEmail(std::string email, std::string subject, std::string content);
+    //TODO Implement email sending, socket is temporary
+    static short SendEmail(std::string email, std::string subject, std::string content, SOCKET socket);
 
     static SOCKET GetSocketByUID(long uid);
     static long GetUIDBySocket(SOCKET socket);

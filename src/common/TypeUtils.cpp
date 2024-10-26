@@ -5,6 +5,7 @@
 #include <openssl/sha.h>
 
 #include <chrono>
+#include <random>
 #include <iostream>
 #include <charconv>
 
@@ -21,6 +22,13 @@ double getCurrentTimestamp() {
     double fractional_day = (now_seconds % 86400 * 1000000 + now_microseconds) / (86400.0 * 1000000);
 
     return days_since_epoch + fractional_day;
+}
+
+unsigned randint(unsigned min, unsigned max) {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_int_distribution<unsigned> dist(min, max);
+    return dist(gen);
 }
 
 std::string generateSalt() {
