@@ -30,6 +30,10 @@ bool isValidString(const std::string& s);
 
 std::string getFirstParam(std::string& message);
 
+
+bool isLocked(std::mutex& m);
+
+
 template<typename T>
 void addToStream(std::stringstream& ss, const T& value) {
     ss << value;

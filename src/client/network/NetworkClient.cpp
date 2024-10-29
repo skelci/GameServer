@@ -35,6 +35,8 @@ void NetworkClient::Stop() {
     receiveThread.join();
     processThread.join();
     sendThread.join();
+    socket->lowest_layer().close();
+    std::cout << "Network client stopped" << std::endl;
 }
 
 void NetworkClient::Connect() {
@@ -63,6 +65,14 @@ void NetworkClient::RecieveData() {
             recieveBuffer.push(std::string(buffer->data(), bytes_transferred));
         } else {
             std::cerr << "Receive failed: " << error.message() << std::endl;
+            if (error == boost::asio::error::eof ||
+                error == boost::asio::error::connection_reset ||
+                error == boost::asio::error::operation_aborted ||
+                error.value() == 1) {
+                
+                running = false;
+                break;
+            }
         }
     }
 }

@@ -12,6 +12,7 @@
 #include <chrono>
 #include <string>
 #include <atomic>
+#include <vector>
 #include <unordered_map>
 
 #define SOCKET std::shared_ptr<boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>
@@ -69,8 +70,13 @@ private:
     static boost::asio::io_context io_context;
     static boost::asio::ssl::context ssl_context;
     static boost::asio::ip::tcp::acceptor acceptor;
+
     static std::vector<SOCKET> clientSockets;
     static std::mutex clientSocketsMutex;
+
+    static std::unordered_map<SOCKET, std::shared_ptr<std::mutex>> clientSocketsMutexes;
+    static std::mutex clientSocketsMutexesMutex;
+    static std::mutex& getSocketMutex(SOCKET socket);
 
     static std::queue<std::string> recieveBuffer;
     static std::mutex recieveBufferMutex;

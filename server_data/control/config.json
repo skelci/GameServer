@@ -11,7 +11,7 @@
 	"dbuser" : "postgres",
 	"emailVerificationTime" : 3,
 	"emailVerificationsAttempts" : 3,
-	"logLevel" : 4,
+	"logLevel" : 5,
 	"loginAttempts" : 3,
 	"loginTime" : 5,
 	"maxLogBufferSize" : 128

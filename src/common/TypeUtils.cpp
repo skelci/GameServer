@@ -106,4 +106,11 @@ std::string getFirstParam(std::string& message) {
     return firstParam;
 }
 
+
+bool isLocked(std::mutex& m) {
+    std::unique_lock<std::mutex> lock(m, std::defer_lock);
+    return !lock.try_lock();
+}
+
+
 }
