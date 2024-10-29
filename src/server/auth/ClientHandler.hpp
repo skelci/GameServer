@@ -5,7 +5,6 @@
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/asio/thread_pool.hpp>
-#include <boost/container/flat_map.hpp>
 
 #include <queue>
 #include <mutex>
@@ -76,7 +75,7 @@ private:
 
     static std::unordered_map<SOCKET, std::shared_ptr<std::mutex>> clientSocketsMutexes;
     static std::mutex clientSocketsMutexesMutex;
-    static std::mutex& getSocketMutex(SOCKET socket);
+    static std::mutex& GetSocketMutex(SOCKET socket);
 
     static std::queue<std::string> recieveBuffer;
     static std::mutex recieveBufferMutex;
@@ -88,18 +87,18 @@ private:
     static std::unordered_map<SOCKET, long> socketToUIDMap;
     static std::mutex clientMapsMutex;
 
-    static boost::container::flat_map<SOCKET, std::chrono::time_point<std::chrono::steady_clock>> unverifiedSockets;
+    static std::unordered_map<SOCKET, std::chrono::time_point<std::chrono::steady_clock>> unverifiedSockets;
     static std::mutex unverifiedSocketsMutex;
 
-    static boost::container::flat_map<unsigned short, SOCKET> unverifiedSocketsIDs;
+    static std::unordered_map<unsigned short, SOCKET> unverifiedSocketsIDs;
     static std::mutex unverifiedSocketsIDsMutex;
     static unsigned short unverifiedSocketsIDsCounter;
 
-    static boost::container::flat_map<unsigned short, UserPreregister> userPreregister;
+    static std::unordered_map<unsigned short, UserPreregister> userPreregister;
     static unsigned short userPreregisterCounter;
     static std::mutex userPreregisterMutex;
 
-    static boost::container::flat_map<long, UserLogin> userLogin;
+    static std::unordered_map<long, UserLogin> userLogin;
     static std::mutex userLoginMutex;
 
     static std::atomic<bool> running;

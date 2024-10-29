@@ -34,18 +34,18 @@ std::unordered_map<long, SOCKET> ClientHandler::uidToSocketMap;
 std::unordered_map<SOCKET, long> ClientHandler::socketToUIDMap;
 std::mutex ClientHandler::clientMapsMutex;
 
-boost::container::flat_map<SOCKET, std::chrono::time_point<std::chrono::steady_clock>> ClientHandler::unverifiedSockets;
+std::unordered_map<SOCKET, std::chrono::time_point<std::chrono::steady_clock>> ClientHandler::unverifiedSockets;
 std::mutex ClientHandler::unverifiedSocketsMutex;
 
-boost::container::flat_map<unsigned short, SOCKET> ClientHandler::unverifiedSocketsIDs;
+std::unordered_map<unsigned short, SOCKET> ClientHandler::unverifiedSocketsIDs;
 std::mutex ClientHandler::unverifiedSocketsIDsMutex;
 unsigned short ClientHandler::unverifiedSocketsIDsCounter;
 
-boost::container::flat_map<unsigned short, UserPreregister> ClientHandler::userPreregister;
+std::unordered_map<unsigned short, UserPreregister> ClientHandler::userPreregister;
 unsigned short ClientHandler::userPreregisterCounter;
 std::mutex ClientHandler::userPreregisterMutex;
 
-boost::container::flat_map<long, UserLogin> ClientHandler::userLogin;
+std::unordered_map<long, UserLogin> ClientHandler::userLogin;
 std::mutex ClientHandler::userLoginMutex;
 
 std::atomic<bool> ClientHandler::running(true);
@@ -59,12 +59,12 @@ unsigned short ClientHandler::loginTime;
 unsigned short ClientHandler::emailVerificationTime;
 
 
-std::mutex& ClientHandler::getSocketMutex(SOCKET socket) {
+std::mutex& ClientHandler::GetSocketMutex(SOCKET socket) {
     #ifdef DEBUG
     {
         std::lock_guard<std::mutex> lock(clientSocketsMutexesMutex);
         if (clientSocketsMutexes.find(socket) == clientSocketsMutexes.end()) {
-            throw std::runtime_error("Socket mutex not found");
+            throw std::runtime_error("[ClientHandler::GetSocketMutex] Socket mutex not found");
         }
     }
     #endif
@@ -130,7 +130,7 @@ void ClientHandler::Shutdown() {
     {
         for (auto& socket : clientSockets) {
             boost::system::error_code ec;
-            std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+            std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
             socket->lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
             socket->lowest_layer().close(ec);
         }
@@ -170,6 +170,7 @@ void ClientHandler::AcceptConnections() {
                     }
                     std::lock_guard<std::mutex> lock(clientSocketsMutex);
                     clientSockets.push_back(socket);
+
                     #ifdef DEBUG
                         std::cout << "Accepted connection" << std::endl;
                     #endif
@@ -182,10 +183,7 @@ void ClientHandler::AcceptConnections() {
         } else {
             std::cerr << "Accept failed: " << error.message() << std::endl;
             ClientServiceLink::SendData("LOG", 4, "Accept failed: " + error.message());
-            // Continue accepting new connections
-            #ifdef DEBUG
-                std::cout << "Ready to accept new connections after accept failure" << std::endl;
-            #endif
+
             AcceptConnections();
         }
     });
@@ -201,7 +199,8 @@ void ClientHandler::RecieveData() {
         for (auto it = clientSockets.begin(); it != clientSockets.end(); ) {
             auto& socket = *it;
             
-            std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+            std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
+
             if (!socket || !socket->lowest_layer().is_open()) {
                 it = clientSockets.erase(it);
                 continue;
@@ -217,7 +216,8 @@ void ClientHandler::RecieveData() {
             auto buffer = std::make_shared<std::vector<char>>(1024);
             socket->async_read_some(boost::asio::buffer(*buffer), [buffer, &isReading, socket, &closedSockets](const boost::system::error_code& error, std::size_t bytes_transferred) mutable {
                 isReading = false;
-                std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+                std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
+
                 if (!socket) return;
 
                 if (!error) {
@@ -227,7 +227,6 @@ void ClientHandler::RecieveData() {
                     {
                         std::lock_guard<std::mutex> lock(unverifiedSocketsMutex);
                         if (unverifiedSockets.find(socket) == unverifiedSockets.end()) {
-                            std::cerr << "Could not find client socket" << std::endl;
                             uid = 1;
                         }
                     }
@@ -258,7 +257,7 @@ void ClientHandler::RecieveData() {
                     return;
                 }
 
-                // std::lock_guard<std::mutex> lock(clientSocketsMutex);
+                // std::lock_guard<std::mutex> clientSocketsLock(clientSocketsMutex);
                 // if (closedSockets.find(&socket->lowest_layer()) == closedSockets.end()) {
                 //     std::cerr << "Receive failed: " << error.message() << std::endl;
                 //     ClientServiceLink::SendData("LOG", 4, "Receive failed: " + error.message());
@@ -318,10 +317,10 @@ void ClientHandler::SendDataFromBuffer() {
                 sendBuffer.pop();
                 sendLock.unlock();
 
-                std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+                std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
                 if (socket && socket->lowest_layer().is_open()) {
                     #ifdef DEBUG
-                        // std::cout << "Sent data: " << data << std::endl;
+                        std::cout << "Sent data: " << data << std::endl;
                     #endif
                     boost::asio::async_write(*socket, boost::asio::buffer(data), [](const boost::system::error_code& error, std::size_t) {
                         if (error) {
@@ -400,7 +399,7 @@ void ClientHandler::Disconnect(SOCKET socket) {
         clientSocketsMutexes.erase(socket);
     }
 
-    std::cout << "Disconnected client" << std::endl;
+    std::cerr << "Disconnected client" << std::endl;
 }
 
 void ClientHandler::AddClient(long uid, SOCKET socket) {
@@ -417,6 +416,16 @@ void ClientHandler::RemoveClient(long uid) {
 }
 
 SOCKET ClientHandler::GetSocketByUID(long uid) {
+    #ifdef DEBUG
+    {
+        std::lock_guard<std::mutex> lock(clientMapsMutex);
+        if (uidToSocketMap.find(uid) == uidToSocketMap.end()) {
+            std::cerr << "Could not find client socket" << std::endl;
+            throw std::runtime_error("[ClientHandler::GetSocketByUID()] Could not find client socket");
+            return nullptr;
+        }
+    }
+    #endif
     std::lock_guard<std::mutex> lock(clientMapsMutex);
     return uidToSocketMap[uid];
 }
@@ -455,7 +464,7 @@ void ClientHandler::CheckUserPreregister() {
             if (std::chrono::duration_cast<std::chrono::minutes>(now - it->second.time).count() > emailVerificationTime) {
                 auto socket = GetSocketByUID(it->first);
                 SendData(socket, "EMAIL", "TIME_EXPIRED");
-                std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+                std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
                 Disconnect(socket);
                 it = userPreregister.erase(it);
             } else {
@@ -476,7 +485,7 @@ void ClientHandler::CheckUserLogin() {
             if (std::chrono::duration_cast<std::chrono::minutes>(now - it->second.time).count() > loginTime) {
                 auto socket = GetSocketByUID(it->first);
                 SendData(socket, "EMAIL", "TIME_EXPIRED");
-                std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+                std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
                 Disconnect(socket);
                 it = userLogin.erase(it);
             } else {
@@ -495,19 +504,23 @@ short ClientHandler::SendEmail(std::string email, std::string subject, std::stri
 }
 
 void ClientHandler::ProcessDataContent(std::string data) {
-    std::cerr << data << std::endl;
+    #ifdef DEBUG
+        std::cout << "Processing data: " << data << std::endl;
+    #endif
+
     bool verified = TypeUtils::getFirstParam(data) == "1";
     long uid = stol(TypeUtils::getFirstParam(data));
     std::string action = TypeUtils::getFirstParam(data);
 
     if (!verified) {
+std::cerr << "unverified" << std::endl;
         SOCKET socket;
         {
             std::lock_guard<std::mutex> lock(unverifiedSocketsIDsMutex);
             socket = unverifiedSocketsIDs[uid];
         }
         if (!TypeUtils::isValidString(action)) {
-            std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+            std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
             Disconnect(socket);
             return;
         }
@@ -516,7 +529,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
             std::string username = TypeUtils::getFirstParam(data);
             std::string password = TypeUtils::getFirstParam(data);
             if (!TypeUtils::isValidString(username) || !TypeUtils::isValidString(password)) {
-                std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+                std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
                 Disconnect(socket);
                 return;
             }
@@ -528,7 +541,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
 
             } else if (uid < 0) {
                 SendData(socket, "ERROR", "Server error during login");
-                std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+                std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
                 Disconnect(socket);
                 std::cerr << "Error getting UID: " << uid << std::endl;
                 ClientServiceLink::SendData("LOG", 5, "Error getting UID: " + std::to_string(uid));
@@ -539,7 +552,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
                 return;
             } else if (err != 1) {
                 SendData(socket, "ERROR", "Server error during login");
-                std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+                std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
                 Disconnect(socket);
                 std::cerr << "Error verifying password: " << err << std::endl;
                 ClientServiceLink::SendData("LOG", 5, "Error verifying password: " + std::to_string(err));
@@ -549,7 +562,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
             std::string email;
             if (err = Auth::GetEmail(uid, email), err != 1) {
                 SendData(socket, "ERROR", "Server error during login");
-                std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+                std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
                 Disconnect(socket);
                 std::cerr << "Error getting email: " << err << std::endl;
                 ClientServiceLink::SendData("LOG", 5, "Error getting email: " + std::to_string(err));
@@ -573,7 +586,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
 
             SendData(socket, "LOGIN", "PREPARE_SUCCESS", emailVerificationTime);
             {
-                std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+                std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
                 if (SendEmail(email, "Email verification", "Your verification code is: " + std::to_string(emailCode), socket) != 1) {
                     SendData(socket, "ERROR", "EMAIL_SEND_ERROR");
                     Disconnect(socket);
@@ -590,7 +603,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
             std::string password = TypeUtils::getFirstParam(data);
             std::string email = TypeUtils::getFirstParam(data);
             if (!TypeUtils::isValidString(username) || !TypeUtils::isValidString(password) || !TypeUtils::isValidString(email)) {
-                std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+                std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
                 Disconnect(socket);
                 return;
             }
@@ -602,7 +615,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
             } else if (err != 0) {
                 ClientServiceLink::SendData("LOG", 5, "Error checking username: " + std::to_string(err));
                 SendData(socket, "ERROR", "Server error during registration");
-                std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+                std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
                 Disconnect(socket);
                 std::cerr << "Error checking username: " << err << std::endl;
                 return;
@@ -613,13 +626,13 @@ void ClientHandler::ProcessDataContent(std::string data) {
             } else if (err != 0) {
                 ClientServiceLink::SendData("LOG", 5, "Error checking email: " + std::to_string(err));
                 SendData(socket, "ERROR", "Server error during registration");
-                std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+                std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
                 Disconnect(socket);
                 std::cerr << "Error checking email: " << err << std::endl;
                 return;
             }
             else if (err = Auth::CheckPassword(password), err == false) {
-                std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+                std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
                 Disconnect(socket);
                 return;
             }
@@ -641,7 +654,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
             }
 
             SendData(socket, "REGISTER", "PREPARE_SUCCESS", emailVerificationTime);
-            std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+            std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
             if (SendEmail(email, "Email verification", "Your verification code is: " + std::to_string(emailCode), socket) != 1) {
                 SendData(socket, "ERROR", "EMAIL_SEND_ERROR");
                 Disconnect(socket);
@@ -649,7 +662,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
             }
             return;
         }
-        std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+        std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
         Disconnect(socket);
         return;
     }
@@ -657,7 +670,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
     SOCKET socket = GetSocketByUID(uid);
 
     if (action.empty()) {
-        std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+        std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
         Disconnect(socket);
         return;
     }
@@ -665,13 +678,13 @@ void ClientHandler::ProcessDataContent(std::string data) {
     if (action == "REGISTER") {
         std::string strEmailCode = TypeUtils::getFirstParam(data);
         if (!TypeUtils::isValidString(strEmailCode)) {
-            std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+            std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
             Disconnect(socket);
             return;
         }
         unsigned emailCode;
         if (!TypeUtils::tryPassUInt(strEmailCode, emailCode)) {
-            std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+            std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
             Disconnect(socket);
             return;
         }
@@ -681,16 +694,16 @@ void ClientHandler::ProcessDataContent(std::string data) {
             std::lock_guard<std::mutex> lock(userPreregisterMutex);
             auto it = userPreregister.find(-uid);
             if (it == userPreregister.end()) {
-                std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+                std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
                 Disconnect(socket);
                 return;
             }
             user = it->second;
         }
-
+std::cerr << "line 703" << std::endl;
         if (user.attempts++ >= emailVerificationsAttempts) {
             SendData(socket, "REGISTER", "EMAIL_CODE_ATTEMPTS_EXCEEDED");
-            std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+            std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
             Disconnect(socket);
             return;
         }
@@ -716,7 +729,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
             return;
         } else {
             SendData(socket, "ERROR", "Server error during registration");
-            std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+            std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
             Disconnect(socket);
             std::cerr << "Error registering user: " << err << std::endl;
             ClientServiceLink::SendData("LOG", 5, "Error registering user: " + std::to_string(err));
@@ -725,7 +738,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
 
         if (uid = Auth::GetUID(user.username), uid < 1) {
             SendData(socket, "ERROR", "Server error during registration");
-            std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+            std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
             Disconnect(socket);
             std::cerr << "Error getting UID: " << uid << std::endl;
             ClientServiceLink::SendData("LOG", 5, "Error getting UID: " + std::to_string(uid));
@@ -740,13 +753,13 @@ void ClientHandler::ProcessDataContent(std::string data) {
     } else if (action == "LOGIN") {
         std::string strEmailCode = TypeUtils::getFirstParam(data);
         if (!TypeUtils::isValidString(strEmailCode)) {
-            std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+            std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
             Disconnect(socket);
             return;
         }
         unsigned emailCode;
         if (!TypeUtils::tryPassUInt(strEmailCode, emailCode)) {
-            std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+            std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
             Disconnect(socket);
             return;
         }
@@ -756,7 +769,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
             std::lock_guard<std::mutex> lock(userLoginMutex);
             auto it = userLogin.find(uid);
             if (it == userLogin.end()) {
-                std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+                std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
                 Disconnect(socket);
                 return;
             }
@@ -765,7 +778,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
 
         if (user.attempts++ >= loginAttempts) {
             SendData(socket, "LOGIN", "EMAIL_CODE_ATTEMPTS_EXCEEDED");
-            std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+            std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
             Disconnect(socket);
             return;
         }
@@ -784,6 +797,6 @@ void ClientHandler::ProcessDataContent(std::string data) {
         return;
     }
 
-    std::lock_guard<std::mutex> lock(getSocketMutex(socket));
+    std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
     Disconnect(socket);
 }
