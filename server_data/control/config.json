@@ -14,5 +14,5 @@
 	"logLevel" : 5,
 	"loginAttempts" : 3,
 	"loginTime" : 5,
-	"maxLogBufferSize" : 128
+	"maxLogBufferSize" : 16
 }
