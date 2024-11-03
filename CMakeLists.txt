@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(InsertName)
+project(GameServer)
 
 include_directories("src")
 include_directories("src/client")
@@ -74,7 +74,7 @@ if(BUILD_SERVER)
 endif()
 
 if(DEBUG)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -DDEBUG -O0") 
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDEBUG -g -O0") 
 endif()
 
 if(RELEASE)
@@ -168,22 +168,23 @@ if(BUILD_SERVER_CONTROL)
 endif()
 
 if(BUILD_SERVER_AUTH)
-    file(GLOB serverauthsrc src/server/auth/*.cpp)
-    add_executable(serverauth ${serverauthsrc} src/server/auth/main.cpp)
+    # file(GLOB serverauthsrc src/server/auth/*.cpp)
+    # add_executable(serverauth ${serverauthsrc} src/server/auth/main.cpp)
+    add_executable(serverauth src/server/auth/main.cpp)
 
     if(WIN32)
-        target_link_libraries(serverauth PUBLIC
-            mswsock
-            ${BOOST_SYSTEM}
-            ${BOOST_THREAD}
-            ${BOOST_CONTAINER}
-            ${SSL_LIBRARY}
-            ${CRYPTO_LIBRARY}
-            pqxx
-            ${PQ_LIBRARY}
-            servershared
-            common
-        )
+        # target_link_libraries(serverauth PUBLIC
+        #     mswsock
+        #     ${BOOST_SYSTEM}
+        #     ${BOOST_THREAD}
+        #     ${BOOST_CONTAINER}
+        #     ${SSL_LIBRARY}
+        #     ${CRYPTO_LIBRARY}
+        #     pqxx
+        #     ${PQ_LIBRARY}
+        #     servershared
+        #     common
+        # )
     else()
         target_link_libraries(serverauth PUBLIC
             pqxx

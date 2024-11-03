@@ -108,8 +108,8 @@ std::string getFirstParam(std::string& message) {
 
 
 bool isLocked(std::mutex& m) {
-    if (m.try_lock()) {
-        m.unlock();
+    std::unique_lock<std::mutex> lock(m, std::try_to_lock);
+    if (lock.owns_lock()) {
         return false;
     } else {
         return true;
