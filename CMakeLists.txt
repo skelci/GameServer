@@ -11,9 +11,9 @@ if(WIN32)
 
     include_directories("C:\\lib\\include")
 
+    link_directories(C:\\lib\\bin)
     link_directories(C:\\lib\\github_repos\\PDCurses-3.9\\wincon)
     link_directories(C:\\lib\\github_repos\\libpqxx-master\\build\\libpqxx\\lib)
-    link_directories(C:\\lib\\github_repos\\jsoncpp-master\\build\\jsoncpp\\lib)
 
     find_library(BOOST_CONTAINER
         NAMES libboost_container${BOOST_LIB_SUFFIX}
@@ -33,10 +33,6 @@ if(WIN32)
     )
     find_library(CRYPTO_LIBRARY
         NAMES libcrypto.a
-        PATHS C:\\lib\\github_repos\\c\\lib
-    )
-    find_library(PQ_LIBRARY
-        NAMES libpq.a
         PATHS C:\\lib\\github_repos\\c\\lib
     )
 endif()
@@ -152,7 +148,7 @@ if(BUILD_SERVER_CONTROL)
         target_link_libraries(servercontrol PUBLIC
             servershared
             pqxx
-            ${PQ_LIBRARY}
+            libpq__
             -l:pdcurses.a
             common
         )
@@ -168,30 +164,27 @@ if(BUILD_SERVER_CONTROL)
 endif()
 
 if(BUILD_SERVER_AUTH)
-    # file(GLOB serverauthsrc src/server/auth/*.cpp)
-    # add_executable(serverauth ${serverauthsrc} src/server/auth/main.cpp)
-    add_executable(serverauth src/server/auth/main.cpp)
+    file(GLOB serverauthsrc src/server/auth/*.cpp)
+    add_executable(serverauth ${serverauthsrc} src/server/auth/main.cpp)
 
     if(WIN32)
-        # target_link_libraries(serverauth PUBLIC
-        #     mswsock
-        #     ${BOOST_SYSTEM}
-        #     ${BOOST_THREAD}
-        #     ${BOOST_CONTAINER}
-        #     ${SSL_LIBRARY}
-        #     ${CRYPTO_LIBRARY}
-        #     pqxx
-        #     ${PQ_LIBRARY}
-        #     servershared
-        #     common
-        # )
+        target_link_libraries(serverauth PUBLIC
+            mswsock
+            ${BOOST_SYSTEM}
+            ${BOOST_THREAD}
+            ${SSL_LIBRARY}
+            ${CRYPTO_LIBRARY}
+            libpq__
+            pqxx
+            servershared
+            common
+        )
     else()
         target_link_libraries(serverauth PUBLIC
             pqxx
             servershared
             boost_system
             boost_thread
-            boost_container
             ssl
             crypto
             common

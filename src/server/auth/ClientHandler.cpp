@@ -322,9 +322,7 @@ void ClientHandler::Disconnect(SOCKET socket) {
 
     boost::system::error_code ec;
     {
-std::cerr << "is socket locked1? " << TypeUtils::isLocked(GetSocketMutex(socket)) << std::endl;
         std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
-std::cerr << "is socket locked2? " << TypeUtils::isLocked(GetSocketMutex(socket)) << std::endl;
         socket->lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
         socket->lowest_layer().close(ec);
     }
@@ -379,23 +377,14 @@ std::cerr << "is socket locked2? " << TypeUtils::isLocked(GetSocketMutex(socket)
             userLogin.erase(it);
         }
     }
-std::cerr << "is socket locked? " << TypeUtils::isLocked(GetSocketMutex(socket)) << std::endl;
+
     {
         std::lock_guard<std::mutex> lock(clientSocketsMutexesMutex);
         auto it = clientSocketsMutexes.find(socket);
         if (it != clientSocketsMutexes.end()) {
-std::cerr << "mutex reference count: " << it->second.use_count() << std::endl;
-std::cerr << "socket reference count: " << socket.use_count() << ", " << it->first.use_count() << std::endl;
-std::cerr << "is socket locked4? " << TypeUtils::isLocked(GetSocketMutex(socket)) << std::endl;
             { std::lock_guard<std::mutex> lock2(*it->second); }
-            auto mutex = it->second;
-std::cerr << "is socket locked5? " << TypeUtils::isLocked(GetSocketMutex(socket)) << std::endl;
-std::cerr << "mutex reference count1: " << it->second.use_count() << std::endl;
             clientSocketsMutexes.erase(socket);
-std::cerr << "mutex is cursed" << std::endl;
         }
-std::cerr << "mutex isn't cursed" << std::endl;
-std::cerr << std::flush;
     }
 
 std::cerr << std::endl;
@@ -411,7 +400,7 @@ std::cerr << "UserPreregister: " << userPreregister.size() << std::endl;
 std::cerr << "UserLogin: " << userLogin.size() << std::endl;
 std::cerr << std::endl;
 
-    std::cerr << "Disconnected client" << std::endl;
+    std::cout << "Disconnected client" << std::endl;
 }
 
 void ClientHandler::AddClient(long uid, SOCKET socket) {
