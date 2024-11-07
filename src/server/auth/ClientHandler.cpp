@@ -205,6 +205,7 @@ void ClientHandler::RecieveData() {
 
             isReading = true;
             auto buffer = std::make_shared<std::vector<char>>(1024);
+            socketLock.lock();
             socket->async_read_some(boost::asio::buffer(*buffer), [buffer, &isReading, socket](const boost::system::error_code& error, std::size_t bytes_transferred) mutable {
                 isReading = false;
 
@@ -328,15 +329,6 @@ void ClientHandler::Disconnect(SOCKET socket) {
     }
 
     {
-        std::lock_guard<std::mutex> lock(clientSocketsMutex);
-        auto it = std::find(clientSockets.begin(), clientSockets.end(), socket);
-        if (it != clientSockets.end()) {
-            clientSockets.erase(it);
-        }
-    }
-
-
-    {
         std::lock_guard<std::mutex> lock(userPreregisterMutex);
         auto it = std::find_if(userPreregister.begin(), userPreregister.end(),
                                [&socket](const auto& pair) { return GetSocketByUID(-(pair.first)) == socket; });
@@ -346,12 +338,11 @@ void ClientHandler::Disconnect(SOCKET socket) {
     }
 
     {
-        std::lock_guard<std::mutex> lock(clientMapsMutex);
-        auto uidIt = std::find_if(uidToSocketMap.begin(), uidToSocketMap.end(),
-                                  [&socket](const auto& pair) { return pair.second == socket; });
-        if (uidIt != uidToSocketMap.end()) {
-            socketToUIDMap.erase(socket);
-            uidToSocketMap.erase(uidIt);
+        std::lock_guard<std::mutex> lock(userLoginMutex);
+        auto it = std::find_if(userLogin.begin(), userLogin.end(),
+                               [&socket](const auto& pair) { return GetSocketByUID(pair.first) == socket; });
+        if (it != userLogin.end()) {
+            userLogin.erase(it);
         }
     }
 
@@ -368,13 +359,22 @@ void ClientHandler::Disconnect(SOCKET socket) {
             unverifiedSocketsIDs.erase(it);
         }
     }
+    
+    {
+        std::lock_guard<std::mutex> lock(clientMapsMutex);
+        auto uidIt = std::find_if(uidToSocketMap.begin(), uidToSocketMap.end(),
+                                  [&socket](const auto& pair) { return pair.second == socket; });
+        if (uidIt != uidToSocketMap.end()) {
+            socketToUIDMap.erase(socket);
+            uidToSocketMap.erase(uidIt);
+        }
+    }
 
     {
-        std::lock_guard<std::mutex> lock(userLoginMutex);
-        auto it = std::find_if(userLogin.begin(), userLogin.end(),
-                               [&socket](const auto& pair) { return GetSocketByUID(pair.first) == socket; });
-        if (it != userLogin.end()) {
-            userLogin.erase(it);
+        std::lock_guard<std::mutex> lock(clientSocketsMutex);
+        auto it = std::find(clientSockets.begin(), clientSockets.end(), socket);
+        if (it != clientSockets.end()) {
+            clientSockets.erase(it);
         }
     }
 
@@ -387,18 +387,20 @@ void ClientHandler::Disconnect(SOCKET socket) {
         }
     }
 
-std::cerr << std::endl;
-std::cerr << "ClientSockets: " << clientSockets.size() << std::endl;
-std::cerr << "ClientSocketsMutexes: " << clientSocketsMutexes.size() << std::endl;
-std::cerr << "RecieveBuffer: " << recieveBuffer.size() << std::endl;
-std::cerr << "SendBuffer: " << sendBuffer.size() << std::endl;
-std::cerr << "UIDToSocketMap: " << uidToSocketMap.size() << std::endl;
-std::cerr << "SocketToUIDMap: " << socketToUIDMap.size() << std::endl;
-std::cerr << "UnverifiedSockets: " << unverifiedSockets.size() << std::endl;
-std::cerr << "UnverifiedSocketsIDs: " << unverifiedSocketsIDs.size() << std::endl;
-std::cerr << "UserPreregister: " << userPreregister.size() << std::endl;
-std::cerr << "UserLogin: " << userLogin.size() << std::endl;
-std::cerr << std::endl;
+    #ifdef DEBUG
+        std::cerr << std::endl;
+        std::cerr << "ClientSockets: " << clientSockets.size() << std::endl;
+        std::cerr << "ClientSocketsMutexes: " << clientSocketsMutexes.size() << std::endl;
+        std::cerr << "RecieveBuffer: " << recieveBuffer.size() << std::endl;
+        std::cerr << "SendBuffer: " << sendBuffer.size() << std::endl;
+        std::cerr << "UIDToSocketMap: " << uidToSocketMap.size() << std::endl;
+        std::cerr << "SocketToUIDMap: " << socketToUIDMap.size() << std::endl;
+        std::cerr << "UnverifiedSockets: " << unverifiedSockets.size() << std::endl;
+        std::cerr << "UnverifiedSocketsIDs: " << unverifiedSocketsIDs.size() << std::endl;
+        std::cerr << "UserPreregister: " << userPreregister.size() << std::endl;
+        std::cerr << "UserLogin: " << userLogin.size() << std::endl;
+        std::cerr << std::endl;
+    #endif
 
     std::cout << "Disconnected client" << std::endl;
 }

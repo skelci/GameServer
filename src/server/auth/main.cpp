@@ -13,9 +13,7 @@ int main() {
     ClientServiceLink::SetMessageHandler(handleMessageContent);
     std::thread connectionThread(&ClientServiceLink::StartClient, DIR + "auth");
 
-    while (!allSettingsReceived()) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
+    while (!allSettingsReceived()) std::this_thread::sleep_for(std::chrono::milliseconds(100));
     
     std::cout << "All settings received." << std::endl;
 
@@ -33,32 +31,3 @@ int main() {
     std::cerr << "Exiting main" << std::endl;
     return 0;
 }
-
-// #include <iostream>
-// #include <mutex>
-
-// namespace TypeUtils123123 {
-//     bool isLockeddsfgdsfgdsfggb(std::mutex& m) {
-//         std::cerr << "Inside isLocked" << std::endl;
-//         std::unique_lock<std::mutex> lock(m, std::try_to_lock);
-//         if (lock.owns_lock()) {
-//             return false; // Mutex was not locked; we now own it
-//         } else {
-//             return true;  // Mutex is already locked
-//         }
-//     }
-// }
-
-// int main() {
-//     std::mutex testMutex;
-//     std::cerr << "function test (should be 0): " << TypeUtils123123::isLockeddsfgdsfgdsfggb(testMutex) << std::endl;
-
-//     {
-//         std::lock_guard<std::mutex> lock(testMutex);
-//         std::cerr << "function test (should be 1): " << TypeUtils123123::isLockeddsfgdsfgdsfggb(testMutex) << std::endl;
-//     }
-
-//     std::cerr << "function test (should be 0): " << TypeUtils123123::isLockeddsfgdsfgdsfggb(testMutex) << std::endl;
-
-//     return 0;
-// }
