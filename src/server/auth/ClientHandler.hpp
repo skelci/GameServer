@@ -50,7 +50,7 @@ public:
     static SOCKET GetSocketByUID(long uid);
     static long GetUIDBySocket(SOCKET socket);
 
-    static void Disconnect(SOCKET socket);
+    static void Disconnect(SOCKET socket, const std::string& reason = "");
 
 private:
     static void AcceptConnections();
