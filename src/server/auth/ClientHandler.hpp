@@ -105,6 +105,9 @@ private:
     static std::atomic<bool> shutdown;
     static const int maxThreads = 1024;
 
+    static std::mutex disconnectMutex;
+    static std::vector<SOCKET> disconnectingSockets;
+
     static boost::asio::thread_pool threadPool;
 
     static unsigned short emailVerificationsAttempts;

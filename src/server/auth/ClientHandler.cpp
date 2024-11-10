@@ -51,6 +51,9 @@ std::mutex ClientHandler::userLoginMutex;
 std::atomic<bool> ClientHandler::running(true);
 std::atomic<bool> ClientHandler::shutdown(false);
 
+std::mutex ClientHandler::disconnectMutex;
+std::vector<SOCKET> ClientHandler::disconnectingSockets;
+
 boost::asio::thread_pool ClientHandler::threadPool(std::thread::hardware_concurrency());
 
 unsigned short ClientHandler::emailVerificationsAttempts;
@@ -95,7 +98,7 @@ void ClientHandler::Start() {
     std::thread(&ClientHandler::ProcessData).detach();
     std::thread(&ClientHandler::SendDataFromBuffer).detach();
 
-    std::cout << "Running io_context..." << std::endl;
+    std::cerr << "Running io_context..." << std::endl << std::flush;
     for (int i = 0; i < std::thread::hardware_concurrency(); ++i) {
         std::thread([]() {
             while (!shutdown) {
@@ -133,6 +136,7 @@ void ClientHandler::AcceptConnections() {
     if (!running) return;
 
     #ifdef DEBUG
+        std::cout << std::flush;
         std::cout << "Waiting to accept connections..." << std::endl;
     #endif
     auto socket = std::make_shared<boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>(io_context, ssl_context);
@@ -193,6 +197,7 @@ void ClientHandler::RecieveData() {
                 readingSockets.erase(&socket->lowest_layer());
                 socketLock.unlock();
                 Disconnect(socket);
+                lock.lock();
                 continue;
             }
 
@@ -200,56 +205,58 @@ void ClientHandler::RecieveData() {
             socketLock.unlock();
             if (isReading) {
                 ++it;
+                lock.lock();
                 continue;
             }
 
             isReading = true;
             auto buffer = std::make_shared<std::vector<char>>(1024);
             socketLock.lock();
-            socket->async_read_some(boost::asio::buffer(*buffer), [buffer, &isReading, socket](const boost::system::error_code& error, std::size_t bytes_transferred) mutable {
+            socket->async_read_some(boost::asio::buffer(*buffer),
+              [buffer, &isReading, socket](const boost::system::error_code& error, std::size_t bytes_transferred) mutable {
                 isReading = false;
 
                 if (!socket) return;
 
-                if (!error) {
-                    std::string data(buffer->data(), bytes_transferred);
-                    long uid = 0;
-                    bool verified = false;
-                    {
-                        std::lock_guard<std::mutex> unvSockLock(unverifiedSocketsMutex);
-                        if (unverifiedSockets.find(socket) == unverifiedSockets.end()) {
-                            uid = 1;
-                        }
-                    }
-                    if (uid == 1) {
-                        uid = GetUIDBySocket(socket);
-                        verified = true;
-                    } else {
-                        std::unique_lock<std::mutex> unvSockLock(unverifiedSocketsIDsMutex);
-                        auto it = std::find_if(unverifiedSocketsIDs.begin(), unverifiedSocketsIDs.end(),
-                                       [&socket](const auto& pair) { return pair.second == socket; });
-                        if (it != unverifiedSocketsIDs.end()) {
-                            unvSockLock.unlock();
-                            uid = it->first;
-                        } else {
-                            unvSockLock.unlock();
-                            Disconnect(socket, "Critical server error: Could not find client socket");
-                            ClientServiceLink::SendData("LOG", 5, "Critical server error: Could not find client socket");
-                            std::cerr << "Critical server error: Could not find client socket" << std::endl;
-                            return;
-                        }
-                    }
-                    data = TypeUtils::stickParams(verified, uid, data);
-
-                    std::lock_guard<std::mutex> lock(recieveBufferMutex);
-                    recieveBuffer.push(data);
-                    #ifdef DEBUG
-                        std::cout << "Received data from client: " << std::string(buffer->data(), bytes_transferred) << "\n";
-                    #endif
+                if (error) {
+                    Disconnect(socket, error.message());
                     return;
                 }
 
-                Disconnect(socket);
+                std::string data(buffer->data(), bytes_transferred);
+                long uid = 0;
+                bool verified = false;
+                {
+                    std::lock_guard<std::mutex> unvSockLock(unverifiedSocketsMutex);
+                    if (unverifiedSockets.find(socket) == unverifiedSockets.end()) {
+                        uid = 1;
+                    }
+                }
+                if (uid == 1) {
+                    uid = GetUIDBySocket(socket);
+                    verified = true;
+                } else {
+                    std::unique_lock<std::mutex> unvSockLock(unverifiedSocketsIDsMutex);
+                    auto it = std::find_if(unverifiedSocketsIDs.begin(), unverifiedSocketsIDs.end(),
+                                    [&socket](const auto& pair) { return pair.second == socket; });
+                    if (it != unverifiedSocketsIDs.end()) {
+                        unvSockLock.unlock();
+                        uid = it->first;
+                    } else {
+                        unvSockLock.unlock();
+                        Disconnect(socket, "Critical server error: Could not find client socket");
+                        ClientServiceLink::SendData("LOG", 5, "Critical server error: Could not find client socket");
+                        std::cerr << "Critical server error: Could not find client socket" << std::endl;
+                        return;
+                    }
+                }
+                data = TypeUtils::stickParams(verified, uid, data);
+
+                std::lock_guard<std::mutex> lock(recieveBufferMutex);
+                recieveBuffer.push(data);
+                #ifdef DEBUG
+                    std::cout << "Received data from client: " << std::string(buffer->data(), bytes_transferred) << "\n";
+                #endif
             });
 
             ++it;
@@ -321,6 +328,20 @@ void ClientHandler::Disconnect(SOCKET socket, const std::string& reason) {
     if (!socket) return;
 
     {
+        std::lock_guard<std::mutex> lock(disconnectMutex);
+        if (std::find(disconnectingSockets.begin(), disconnectingSockets.end(), socket) != disconnectingSockets.end()) {
+            return;
+        }
+        disconnectingSockets.push_back(socket);
+    }
+    
+    if (!socket) return;
+
+    #ifdef DEBUG
+        std::cout << "Disconnecting client with socket: " << socket->lowest_layer().native_handle() << std::endl;
+    #endif
+    
+    {
         std::lock_guard<std::mutex> lock(sendBufferMutex);
         std::lock_guard<std::mutex> lock2(GetSocketMutex(socket));
         std::queue<TypeUtils::Message> tempQueue;
@@ -345,15 +366,15 @@ void ClientHandler::Disconnect(SOCKET socket, const std::string& reason) {
     {
         std::lock_guard<std::mutex> socketLock(GetSocketMutex(socket));
         if (socket && socket->lowest_layer().is_open()) {
-            boost::asio::async_write(*socket, boost::asio::buffer(TypeUtils::stickParams("DISCONNECT", reason)), [](const boost::system::error_code&, std::size_t) {});
-        }
-    }
+            boost::asio::async_write(*socket, boost::asio::buffer(TypeUtils::stickParams("DISCONNECT", reason)),
+                [socket](const boost::system::error_code&, std::size_t) {});
 
-    boost::system::error_code ec;
-    {
-        std::lock_guard<std::mutex> lock(GetSocketMutex(socket));
-        socket->lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
-        socket->lowest_layer().close(ec);
+            boost::system::error_code ec;
+            socket->lowest_layer().cancel(ec);
+
+            socket->lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+            socket->lowest_layer().close(ec);
+        }
     }
 
     {
@@ -415,22 +436,33 @@ void ClientHandler::Disconnect(SOCKET socket, const std::string& reason) {
         }
     }
 
+    {
+        std::lock_guard<std::mutex> lock(disconnectMutex);
+        auto it = std::find(disconnectingSockets.begin(), disconnectingSockets.end(), socket);
+        if (it != disconnectingSockets.end()) {
+            disconnectingSockets.erase(it);
+        }
+    }
+
     #ifdef DEBUG
-        std::cerr << std::endl;
-        std::cerr << "ClientSockets: " << clientSockets.size() << std::endl;
-        std::cerr << "ClientSocketsMutexes: " << clientSocketsMutexes.size() << std::endl;
-        std::cerr << "RecieveBuffer: " << recieveBuffer.size() << std::endl;
-        std::cerr << "SendBuffer: " << sendBuffer.size() << std::endl;
-        std::cerr << "UIDToSocketMap: " << uidToSocketMap.size() << std::endl;
-        std::cerr << "SocketToUIDMap: " << socketToUIDMap.size() << std::endl;
-        std::cerr << "UnverifiedSockets: " << unverifiedSockets.size() << std::endl;
-        std::cerr << "UnverifiedSocketsIDs: " << unverifiedSocketsIDs.size() << std::endl;
-        std::cerr << "UserPreregister: " << userPreregister.size() << std::endl;
-        std::cerr << "UserLogin: " << userLogin.size() << std::endl;
-        std::cerr << std::endl;
+        std::cout << std::flush;
+        std::cout << "\n";
+        std::cout << "ClientSockets: " << clientSockets.size() << "\n";
+        std::cout << "ClientSocketsMutexes: " << clientSocketsMutexes.size() << "\n";
+        std::cout << "RecieveBuffer: " << recieveBuffer.size()<< "\n";
+        std::cout << "SendBuffer: " << sendBuffer.size() << "\n";
+        std::cout << "UIDToSocketMap: " << uidToSocketMap.size() << "\n";
+        std::cout << "SocketToUIDMap: " << socketToUIDMap.size() << "\n";
+        std::cout << "UnverifiedSockets: " << unverifiedSockets.size() << "\n";
+        std::cout << "UnverifiedSocketsIDs: " << unverifiedSocketsIDs.size() << "\n";
+        std::cout << "UserPreregister: " << userPreregister.size() << "\n";
+        std::cout << "UserLogin: " << userLogin.size() << "\n";
+        std::cout << "DisconnectingSockets: " << disconnectingSockets.size() << "\n";
+        std::cout << "\n";
+        std::cout << std::flush;
     #endif
 
-    std::cout << "Disconnected client" << std::endl;
+    std::cout << "Disconnected client:" << reason << std::endl;
 }
 
 void ClientHandler::AddClient(long uid, SOCKET socket) {
@@ -552,11 +584,12 @@ void ClientHandler::ProcessDataContent(std::string data) {
 
             if (uid = Auth::GetUID(username), uid == 0) {
                 SendData(socket, "LOGIN", "WRONG_USERNAME");
-
+                return;
             } else if (uid < 0) {
                 Disconnect(socket, "Critical server error: Error during login");
                 std::cerr << "Error getting UID: " << uid << std::endl;
                 ClientServiceLink::SendData("LOG", 5, "Error getting UID: " + std::to_string(uid));
+                return;
             }
 
             if (err = Auth::VerifyPassword(uid, password), err == 0) {
@@ -623,6 +656,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
                 std::cerr << "Error checking username: " << err << std::endl;
                 return;
             }
+
             else if (err = Auth::CheckEmail(email), err == 1) {
                 SendData(socket, "REGISTER", "EMAIL_EXISTS");
                 return;
@@ -695,10 +729,6 @@ void ClientHandler::ProcessDataContent(std::string data) {
             user = it->second;
         }
 
-        if (user.attempts++ >= emailVerificationsAttempts) {
-            Disconnect(socket, "Email verification attempts exceeded");
-            return;
-        }
         if (user.emailCode != emailCode) {
             SendData(socket, "REGISTER", "EMAIL_CODE_INCORRECT");
             {
@@ -707,10 +737,13 @@ void ClientHandler::ProcessDataContent(std::string data) {
             }
             return;
         }
+        if (user.attempts++ >= emailVerificationsAttempts) {
+            Disconnect(socket, "Email verification attempts exceeded");
+            return;
+        }
 
         short err;
         if (err = Auth::RegisterUser(user.username, user.password, user.email), err == 1) {
-            SendData(socket, "REGISTER", "SUCCESS");
             RemoveClient(uid);
             {
                 std::lock_guard<std::mutex> lock(userPreregisterMutex);
@@ -726,6 +759,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
             return;
         }
 
+        long oldUID = uid;
         if (uid = Auth::GetUID(user.username), uid < 1) {
             Disconnect(socket, "Critical server error during registration");
             std::cerr << "Error getting UID: " << uid << std::endl;
@@ -733,6 +767,11 @@ void ClientHandler::ProcessDataContent(std::string data) {
             return;
         }
         AddClient(uid, socket);
+
+        {
+            std::lock_guard<std::mutex> lock(userPreregisterMutex);
+            userPreregister.erase(-oldUID);
+        }
 
         SendData(socket, "RELOGIN_TOKEN", Auth::CreateReloginToken(uid));
 
@@ -761,11 +800,6 @@ void ClientHandler::ProcessDataContent(std::string data) {
             user = it->second;
         }
 
-        if (user.attempts++ >= loginAttempts) {
-            Disconnect(socket, "Login attempts exceeded");
-            return;
-        }
-
         if (user.emailCode != emailCode) {
             SendData(socket, "LOGIN", "EMAIL_CODE_INCORRECT");
             {
@@ -773,6 +807,15 @@ void ClientHandler::ProcessDataContent(std::string data) {
                 userLogin[uid] = user;
             }
             return;
+        }
+        if (user.attempts++ >= loginAttempts) {
+            Disconnect(socket, "Login attempts exceeded");
+            return;
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(userLoginMutex);
+            userLogin.erase(uid);
         }
 
         SendData(socket, "RELOGIN_TOKEN", Auth::CreateReloginToken(uid));

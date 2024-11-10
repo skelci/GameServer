@@ -301,12 +301,12 @@ int Auth::GetUID(const std::string& username) {
         );
 
         if (result.empty()) { // User not found
-            return -1;
+            return 0;
         }
 
         return result[0]["uid"].as<int>();
     } catch (const std::exception& e) {
-        std::cerr << "Error getting UID: " << e.what() << std::endl;
+        std::cerr << "[Auth.cpp:309] Error getting UID: " << e.what() << std::endl;
         return -9;
     }
 }
