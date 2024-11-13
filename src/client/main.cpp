@@ -30,9 +30,101 @@ void networkTemp(){
     client.Stop();
 }
 
+void testNetworkClient() {
+    std::string server = "127.0.0.1";
+    unsigned short port = 8083;
+
+    std::srand(std::time(nullptr));
+    int test = std::rand() % 10;
+
+    NetworkClient client(server, port);
+
+    try {
+        switch (test) {
+            case 0:
+                client.Start();
+                client.SendMessage("REGISTER_PREPARE", "test", "test");
+                client.Stop();
+                break;
+
+            case 1:
+                client.Start();
+                client.SendMessage("REGISTER_PREPARE", "test", "qwerQWER12341!\"#$", "123456");
+                client.SendMessage("REGISTER", "123456"); 
+                client.Stop();
+                break;
+
+            case 2:
+                client.Start();
+                client.SendMessage("LOGIN_PREPARE", "test", "qwerQWER12341!\"#$");
+                client.SendMessage("LOGIN", "123456");
+                client.Stop();
+                break;
+
+            case 3:
+                client.Start();
+                client.SendMessage("REGISTER_PREPARE", "test", "qwerQWER12341!\"#$", "123456");
+                client.SendMessage("LOGIN", "123456"); 
+                client.Stop();
+                break;
+
+            case 4:
+                client.Start();
+                client.SendMessage("LOGIN_PREPARE", "test", "qwerQWER12341!\"#$");
+                client.SendMessage("REGISTER", "123456");
+                client.Stop();
+                break;
+
+            case 5:
+                client.Start();
+                client.SendMessage("LOGIN", "123456");
+                client.Stop();
+                break;
+
+            case 6:
+                client.Start();
+                client.SendMessage("REGISTER", "123456");
+                client.Stop();
+                break;
+
+            case 7:
+                client.Start();
+                client.SendMessage("UNKNOWN", "hehe");
+                client.Stop();
+                break;
+            
+            case 8:
+                client.Start();
+                client.SendMessage("LOGIN_PREPARE");
+                client.Stop();
+                break;
+
+            case 9:
+                client.Start();
+                client.SendMessage("REGISTER_PREPARE");
+                client.Stop();
+                break;
+            }
+
+            testNetworkClient();
+    } catch (std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+
+        testNetworkClient();
+    }
+}
+
+void RunTests(int threads){
+    for (int i = 0; i < threads; i++) {
+        std::thread(testNetworkClient).detach();
+    }
+    std::this_thread::sleep_for(std::chrono::seconds(60));
+}
+
 int main(){
 
-    networkTemp();
+    // networkTemp();
+    RunTests(1000);
 
     return 0;
 }

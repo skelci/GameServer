@@ -27,14 +27,6 @@ if(WIN32)
         NAMES libboost_thread${BOOST_LIB_SUFFIX}
         PATHS C:\\lib\\github_repos\\boost_1_85_0\\stage\\lib
     )
-    find_library(SSL_LIBRARY
-        NAMES libssl.a
-        PATHS C:\\lib\\github_repos\\c\\lib
-    )
-    find_library(CRYPTO_LIBRARY
-        NAMES libcrypto.a
-        PATHS C:\\lib\\github_repos\\c\\lib
-    )
 endif()
 
 
@@ -83,14 +75,14 @@ if(BUILD_COMMON)
 
     if(WIN32)
         target_link_libraries(common PUBLIC
-            ${SSL_LIBRARY}
-            ${CRYPTO_LIBRARY}
+            crypto-1_1-x64__
+            ssl-1_1-x64__
             ws2_32
         )
     else()
         target_link_libraries(common PUBLIC
-            ssl
             crypto
+            ssl
         )
     endif()
 endif()
@@ -103,21 +95,21 @@ if(BUILD_CLIENT)
     
     if(WIN32)
         target_link_libraries(client PUBLIC
-            ws2_32
             ${BOOST_SYSTEM}
             ${BOOST_THREAD}
-            ${SSL_LIBRARY}
-            ${CRYPTO_LIBRARY}
+            crypto-1_1-x64__
+            ssl-1_1-x64__
+            ws2_32
             common
         )
     else()
         target_link_libraries(client PUBLIC
-            ssl
-            crypto
-            jsoncpp
             boost_system
             boost_thread
+            jsoncpp
+            crypto
             common
+            ssl
         )
     endif()
 endif()
@@ -146,19 +138,19 @@ if(BUILD_SERVER_CONTROL)
 
     if(WIN32)
         target_link_libraries(servercontrol PUBLIC
-            servershared
-            pqxx
-            libpq__
             -l:pdcurses.a
+            servershared
+            libpq__
             common
+            pqxx
         )
     else()
         target_link_libraries(servercontrol PUBLIC
             servershared
-            pqxx
             ncurses
-            SDL2
             common
+            pqxx
+            SDL2
         )
     endif()
 endif()
@@ -169,25 +161,25 @@ if(BUILD_SERVER_AUTH)
 
     if(WIN32)
         target_link_libraries(serverauth PUBLIC
-            mswsock
             ${BOOST_SYSTEM}
             ${BOOST_THREAD}
-            ${SSL_LIBRARY}
-            ${CRYPTO_LIBRARY}
-            libpq__
-            pqxx
+            crypto-1_1-x64__
+            ssl-1_1-x64__
             servershared
+            mswsock
+            libpq__
             common
+            pqxx
         )
     else()
         target_link_libraries(serverauth PUBLIC
-            pqxx
             servershared
             boost_system
             boost_thread
-            ssl
             crypto
             common
+            ssl
+            pqxx
         )
     endif()
 endif()

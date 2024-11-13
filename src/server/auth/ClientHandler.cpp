@@ -183,29 +183,30 @@ void ClientHandler::AcceptConnections() {
 
 void ClientHandler::RecieveData() {
     using lowest_layer_type = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>::lowest_layer_type;
-    std::unordered_map<lowest_layer_type*, bool> readingSockets;
+    std::unordered_map<SOCKET, bool> readingSockets;
+    std::unique_lock<std::mutex> lock(clientSocketsMutex);
+    lock.unlock();
 
     while (!shutdown) {
-        std::unique_lock<std::mutex> lock(clientSocketsMutex);
+        lock.lock();
         for (auto it = clientSockets.begin(); it != clientSockets.end(); ) {
-            lock.unlock();
             auto& socket = *it;
-            
+
             std::unique_lock<std::mutex> socketLock(GetSocketMutex(socket));
 
             if (!socket || !socket->lowest_layer().is_open()) {
-                readingSockets.erase(&socket->lowest_layer());
+                readingSockets.erase(socket);
                 socketLock.unlock();
+                lock.unlock();
                 Disconnect(socket);
                 lock.lock();
-                continue;
+                break;
             }
 
-            auto& isReading = readingSockets[&socket->lowest_layer()];
+            auto& isReading = readingSockets[socket];
             socketLock.unlock();
             if (isReading) {
                 ++it;
-                lock.lock();
                 continue;
             }
 
@@ -260,9 +261,9 @@ void ClientHandler::RecieveData() {
             });
 
             ++it;
-            lock.lock();
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        lock.unlock();
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }
 
@@ -336,10 +337,6 @@ void ClientHandler::Disconnect(SOCKET socket, const std::string& reason) {
     }
     
     if (!socket) return;
-
-    #ifdef DEBUG
-        std::cout << "Disconnecting client with socket: " << socket->lowest_layer().native_handle() << std::endl;
-    #endif
     
     {
         std::lock_guard<std::mutex> lock(sendBufferMutex);
@@ -353,7 +350,7 @@ void ClientHandler::Disconnect(SOCKET socket, const std::string& reason) {
             if (msg.socket == socket) {
                 std::lock_guard<std::mutex> socketLock(GetSocketMutex(socket));
                 if (socket && socket->lowest_layer().is_open()) {
-                    boost::asio::async_write(*socket, boost::asio::buffer(msg.content), [](const boost::system::error_code&, std::size_t) {});
+                    boost::asio::write(*socket, boost::asio::buffer(msg.content));
                 }
             } else {
                 tempQueue.push(msg);
@@ -462,7 +459,7 @@ void ClientHandler::Disconnect(SOCKET socket, const std::string& reason) {
         std::cout << std::flush;
     #endif
 
-    std::cout << "Disconnected client:" << reason << std::endl;
+    std::cout << "Disconnected client: " << reason << std::endl;
 }
 
 void ClientHandler::AddClient(long uid, SOCKET socket) {
@@ -720,9 +717,10 @@ void ClientHandler::ProcessDataContent(std::string data) {
 
         UserPreregister user;
         {
-            std::lock_guard<std::mutex> lock(userPreregisterMutex);
+            std::unique_lock<std::mutex> lock(userPreregisterMutex);
             auto it = userPreregister.find(-uid);
             if (it == userPreregister.end()) {
+                lock.unlock();
                 Disconnect(socket, "Invalid data");
                 return;
             }
@@ -791,9 +789,10 @@ void ClientHandler::ProcessDataContent(std::string data) {
 
         UserLogin user;
         {
-            std::lock_guard<std::mutex> lock(userLoginMutex);
+            std::unique_lock<std::mutex> lock(userLoginMutex);
             auto it = userLogin.find(uid);
             if (it == userLogin.end()) {
+                lock.unlock();
                 Disconnect(socket, "Invalid data");
                 return;
             }
