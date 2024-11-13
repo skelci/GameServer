@@ -65,21 +65,8 @@ short Auth::RegisterUser(const std::string& username, const std::string& passwor
     }
 }
 
-bool Auth::LoginUser(int uid, const std::string& password) {
-    //TODO Implement login logic
-    return true;
-}
-
-bool Auth::LoginUser(int uid) {
-    //TODO Implement login logic
-    return true;
-}
-
-void Auth::LogoutUser(int uid) {
-    //TODO Implement logout logic
-}
-
 short Auth::ChangePassword(int uid, const std::string& oldPassword, const std::string& newPassword) {
+    std::lock_guard<std::mutex> lock(mainMutex);
     try {
         auto conn = c.load();
         if (!conn) {
@@ -113,6 +100,7 @@ short Auth::ChangePassword(int uid, const std::string& oldPassword, const std::s
 }
 
 short Auth::VerifyPassword(int uid, const std::string& password) {
+    std::lock_guard<std::mutex> lock(mainMutex);
     try {
         auto conn = c.load();
         if (!conn) {
@@ -143,12 +131,8 @@ short Auth::VerifyPassword(int uid, const std::string& password) {
     }
 }
 
-short Auth::VerifyEmail(const std::string& email) {
-    //TODO Implement email verification logic
-    return true;
-}
-
 short Auth::CheckUsername(const std::string& username) {
+    std::lock_guard<std::mutex> lock(mainMutex);
     try {
         auto conn = c.load();
         if (!conn) {
@@ -174,7 +158,7 @@ short Auth::CheckUsername(const std::string& username) {
 }
 
 bool Auth::CheckPassword(const std::string& password) {
-    if (password.length() < 8) {
+    if (password.length() < 12) {
         return false;
     }
 
@@ -198,6 +182,7 @@ bool Auth::CheckPassword(const std::string& password) {
 }
 
 short Auth::CheckEmail(const std::string& email) {
+    std::lock_guard<std::mutex> lock(mainMutex);
     try {
         auto conn = c.load();
         if (!conn) {
@@ -223,6 +208,7 @@ short Auth::CheckEmail(const std::string& email) {
 }
 
 std::string Auth::CreateReloginToken(int uid) {
+    std::lock_guard<std::mutex> lock(mainMutex);
     try {
         auto conn = c.load();
         if (!conn) {
@@ -256,6 +242,7 @@ std::string Auth::CreateReloginToken(int uid) {
 }
 
 short Auth::VerifyReloginToken(int uid, const std::string& token) {
+    std::lock_guard<std::mutex> lock(mainMutex);
     try {
         auto conn = c.load();
         if (!conn) {
@@ -287,6 +274,7 @@ short Auth::VerifyReloginToken(int uid, const std::string& token) {
 }
 
 int Auth::GetUID(const std::string& username) {
+    std::lock_guard<std::mutex> lock(mainMutex);
     try {
         auto conn = c.load();
         if (!conn) {
@@ -312,6 +300,7 @@ int Auth::GetUID(const std::string& username) {
 }
 
 short Auth::GetEmail(int uid, std::string& email) {
+    std::lock_guard<std::mutex> lock(mainMutex);
     try {
         auto conn = c.load();
         if (!conn) {
