@@ -690,7 +690,45 @@ void ClientHandler::ProcessDataContent(std::string data) {
                 return;
             }
             return;
-        }
+        
+        } else if (action == "RELOGIN") {
+            std::string username = TypeUtils::getFirstParam(data);
+            std::string token = TypeUtils::getFirstParam(data);
+            if (!TypeUtils::isValidString(token) || !TypeUtils::isValidString(username)) {
+                Disconnect(socket, "Invalid data");
+                return;
+            }
+
+            if (uid = Auth::GetUID(username), uid == 0) {
+                SendData(socket, "LOGIN", "WRONG_USERNAME");
+                return;
+            } else if (uid < 0) {
+                Disconnect(socket, "Critical server error: Error during login");
+                std::cerr << "Error getting UID: " << uid << std::endl;
+                ClientServiceLink::SendData("LOG", 5, "Error getting UID: " + std::to_string(uid));
+                return;
+            }
+
+            if (!Auth::VerifyReloginToken(uid, token)) {
+                SendData(socket, "LOGIN", "WRONG_TOKEN");
+                return;
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(unverifiedSocketsIDsMutex);
+                unverifiedSocketsIDs.erase(uid);
+            }
+            {
+                std::lock_guard<std::mutex> lock(unverifiedSocketsMutex);
+                unverifiedSockets.erase(socket);
+            }
+            
+            AddClient(uid, socket);
+
+            SendData(socket, Auth::CreateReloginToken(uid));
+
+            return;
+        } 
 
         Disconnect(socket, "Invalid data");
         return;
@@ -818,6 +856,30 @@ void ClientHandler::ProcessDataContent(std::string data) {
         }
 
         SendData(socket, "RELOGIN_TOKEN", Auth::CreateReloginToken(uid));
+
+        return;
+    
+    } else if (action == "CHANGE_PASSWORD") {
+        std::string oldPassword = TypeUtils::getFirstParam(data);
+        std::string newPassword = TypeUtils::getFirstParam(data);
+        if (!TypeUtils::isValidString(oldPassword) || !TypeUtils::isValidString(newPassword)) {
+            Disconnect(socket, "Invalid data");
+            return;
+        }
+
+        short err;
+        if (err = Auth::ChangePassword(uid, oldPassword, newPassword), err == 1) {
+            SendData(socket, "CHANGE_PASSWORD", "SUCCESS");
+            return;
+        } else if (err == 0) {
+            SendData(socket, "CHANGE_PASSWORD", "WRONG_PASSWORD");
+            return;
+        } else {
+            Disconnect(socket, "Critical server error during password change");
+            std::cerr << "Error changing password: " << err << std::endl;
+            ClientServiceLink::SendData("LOG", 5, "Error changing password: " + std::to_string(err));
+            return;
+        }
 
         return;
     }

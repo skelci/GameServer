@@ -13,13 +13,10 @@ public:
     static void Init();
 
     static short RegisterUser(const std::string& username, const std::string& password, const std::string& email);
-    static bool LoginUser(int uid, const std::string& password);
-    static bool LoginUser(int uid);
-    static void LogoutUser(int uid);
+    
     static short ChangePassword(int uid, const std::string& oldPassword, const std::string& newPassword);
 
     static short VerifyPassword(int uid, const std::string& password);
-    static short VerifyEmail(const std::string& email);
 
     static short CheckUsername(const std::string& username);
     static bool CheckPassword(const std::string& password);
