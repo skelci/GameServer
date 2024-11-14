@@ -125,6 +125,12 @@ void NetworkClient::SendData() {
     }
 }
 
+void NetworkClient::SetMsgHandler(std::function<void(const std::string&)> handler) {
+    msgHandler = handler;
+}
+
 void NetworkClient::ProcessDataContent(std::string& data) {
-    std::cout << data << "\n";
+    if (msgHandler) {
+        msgHandler(data);
+    }
 }

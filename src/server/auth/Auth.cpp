@@ -157,30 +157,6 @@ short Auth::CheckUsername(const std::string& username) {
     }
 }
 
-bool Auth::CheckPassword(const std::string& password) {
-    if (password.length() < 12) {
-        return false;
-    }
-
-    bool hasUpper = false;
-    bool hasLower = false;
-    bool hasDigit = false;
-    bool hasSpecial = false;
-
-    for (char c : password) {
-        if (std::isupper(c)) hasUpper = true;
-        else if (std::islower(c)) hasLower = true;
-        else if (std::isdigit(c)) hasDigit = true;
-        else if (std::ispunct(c)) hasSpecial = true;
-    }
-
-    if (hasUpper && hasLower && hasDigit && hasSpecial) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
 short Auth::CheckEmail(const std::string& email) {
     std::lock_guard<std::mutex> lock(mainMutex);
     try {

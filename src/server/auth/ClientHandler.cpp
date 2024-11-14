@@ -663,7 +663,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
                 std::cerr << "Error checking email: " << err << std::endl;
                 return;
             }
-            else if (err = Auth::CheckPassword(password), err == false) {
+            else if (err = TypeUtils::checkPassword(password), err == false) {
                 Disconnect(socket, "Client error: Outdated/cheated client");
                 return;
             }

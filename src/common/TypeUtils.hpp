@@ -28,6 +28,8 @@ bool tryPassUInt(const std::string& s, unsigned int& i);
 
 bool isValidString(const std::string& s);
 
+bool checkPassword(const std::string& password);
+
 std::string getFirstParam(std::string& message);
 
 

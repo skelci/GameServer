@@ -10,6 +10,7 @@
 #include <mutex>
 #include <atomic>
 #include <iostream>
+#include <functional>
 
 class NetworkClient {
 public:
@@ -19,6 +20,8 @@ public:
 
 	template <typename... Args>
 	void SendMessage(const Args&... args);
+
+	void SetMsgHandler(std::function<void(const std::string&)> handler);
 
 private:
 	void Connect();
@@ -44,6 +47,8 @@ private:
 
 	std::string server;
 	unsigned short port;
+
+	std::function<void(const std::string&)> msgHandler;
 };
 
 template <typename... Args>

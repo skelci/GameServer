@@ -90,6 +90,30 @@ bool isValidString(const std::string& str) {
     return true;
 }
 
+bool checkPassword(const std::string& password) {
+    if (password.length() < 12) {
+        return false;
+    }
+
+    bool hasUpper = false;
+    bool hasLower = false;
+    bool hasDigit = false;
+    bool hasSpecial = false;
+
+    for (char c : password) {
+        if (std::isupper(c)) hasUpper = true;
+        else if (std::islower(c)) hasLower = true;
+        else if (std::isdigit(c)) hasDigit = true;
+        else if (std::ispunct(c)) hasSpecial = true;
+    }
+
+    if (hasUpper && hasLower && hasDigit && hasSpecial) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 std::string getFirstParam(std::string& message) {
     size_t pos = message.find(static_cast<char>(30));
     
