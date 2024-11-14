@@ -62,11 +62,6 @@ unsigned short ClientHandler::loginTime;
 unsigned short ClientHandler::emailVerificationTime;
 
 
-std::mutex& ClientHandler::GetSocketMutex(SOCKET socket) {
-    std::lock_guard<std::mutex> lock(clientSocketsMutexesMutex);
-    return *clientSocketsMutexes[socket];
-}
-
 void ClientHandler::Init(unsigned short port) {
     const std::string certFile = DIR + "auth/network/server.crt";
     const std::string keyFile = DIR + "auth/network/server.key";
@@ -441,25 +436,12 @@ void ClientHandler::Disconnect(SOCKET socket, const std::string& reason) {
         }
     }
 
-    #ifdef DEBUG
-        std::cout << std::flush;
-        std::cout << "\n";
-        std::cout << "ClientSockets: " << clientSockets.size() << "\n";
-        std::cout << "ClientSocketsMutexes: " << clientSocketsMutexes.size() << "\n";
-        std::cout << "RecieveBuffer: " << recieveBuffer.size()<< "\n";
-        std::cout << "SendBuffer: " << sendBuffer.size() << "\n";
-        std::cout << "UIDToSocketMap: " << uidToSocketMap.size() << "\n";
-        std::cout << "SocketToUIDMap: " << socketToUIDMap.size() << "\n";
-        std::cout << "UnverifiedSockets: " << unverifiedSockets.size() << "\n";
-        std::cout << "UnverifiedSocketsIDs: " << unverifiedSocketsIDs.size() << "\n";
-        std::cout << "UserPreregister: " << userPreregister.size() << "\n";
-        std::cout << "UserLogin: " << userLogin.size() << "\n";
-        std::cout << "DisconnectingSockets: " << disconnectingSockets.size() << "\n";
-        std::cout << "\n";
-        std::cout << std::flush;
-    #endif
-
     std::cout << "Disconnected client: " << reason << std::endl;
+}
+
+std::mutex& ClientHandler::GetSocketMutex(SOCKET socket) {
+    std::lock_guard<std::mutex> lock(clientSocketsMutexesMutex);
+    return *clientSocketsMutexes[socket];
 }
 
 void ClientHandler::AddClient(long uid, SOCKET socket) {
@@ -547,6 +529,13 @@ short ClientHandler::SendEmail(std::string email, std::string subject, std::stri
     SendData(socket, subject, content);
 
     return 1;
+}
+
+void ClientHandler::SendLoginToken(SOCKET socket, long uid) {
+    std::string token = TypeUtils::generateSalt();
+
+    SendData(socket, "LOGIN_TOKEN", token);
+    ClientServiceLink::SendData("LOGIN", uid, token);
 }
 
 void ClientHandler::ProcessDataContent(std::string data) {
@@ -727,6 +716,8 @@ void ClientHandler::ProcessDataContent(std::string data) {
 
             SendData(socket, Auth::CreateReloginToken(uid));
 
+            SendLoginToken(socket, uid);
+
             return;
         } 
 
@@ -811,6 +802,8 @@ void ClientHandler::ProcessDataContent(std::string data) {
 
         SendData(socket, "RELOGIN_TOKEN", Auth::CreateReloginToken(uid));
 
+        SendLoginToken(socket, uid);
+
         return;
     
     } else if (action == "LOGIN") {
@@ -856,6 +849,8 @@ void ClientHandler::ProcessDataContent(std::string data) {
         }
 
         SendData(socket, "RELOGIN_TOKEN", Auth::CreateReloginToken(uid));
+
+        SendLoginToken(socket, uid);
 
         return;
     

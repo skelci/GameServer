@@ -66,6 +66,8 @@ private:
 
     static void ProcessDataContent(std::string data);
 
+    static void SendLoginToken(SOCKET socket, long uid);
+
     static boost::asio::io_context io_context;
     static boost::asio::ssl::context ssl_context;
     static boost::asio::ip::tcp::acceptor acceptor;
