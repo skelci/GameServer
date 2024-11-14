@@ -4,7 +4,10 @@
 #include "defines.hpp"
 
 #include <thread>
-#include <iostream>
+
+#ifdef DEBUG
+    #include <iostream>
+#endif
 
 
 int main() {

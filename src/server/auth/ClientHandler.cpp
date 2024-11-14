@@ -8,11 +8,13 @@
 #include <boost/asio/post.hpp>
 
 #include <thread>
-#include <iostream>
 #include <algorithm>
 #include <filesystem>
 #include <unordered_map>
-#include <unordered_set>
+
+#ifdef DEBUG
+#include <iostream>
+#endif
 
 boost::asio::io_context ClientHandler::io_context;
 boost::asio::ssl::context ClientHandler::ssl_context(boost::asio::ssl::context::tlsv13);
@@ -93,7 +95,7 @@ void ClientHandler::Start() {
     std::thread(&ClientHandler::ProcessData).detach();
     std::thread(&ClientHandler::SendDataFromBuffer).detach();
 
-    std::cerr << "Running io_context..." << std::endl << std::flush;
+    ClientServiceLink::Log("Running io context...");
     for (int i = 0; i < std::thread::hardware_concurrency(); ++i) {
         std::thread([]() {
             while (!shutdown) {
@@ -123,17 +125,12 @@ void ClientHandler::Shutdown() {
     }
 
     io_context.stop();
-    std::cout << "Server has been shut down." << std::endl;
-    ClientServiceLink::SendData("LOG", 2, "Server has been shut down.");
+    ClientServiceLink::Log("Server has been shut down.", 1);
 }
 
 void ClientHandler::AcceptConnections() {
     if (!running) return;
 
-    #ifdef DEBUG
-        std::cout << std::flush;
-        std::cout << "Waiting to accept connections..." << std::endl;
-    #endif
     auto socket = std::make_shared<boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>(io_context, ssl_context);
     acceptor.async_accept(socket->lowest_layer(), [socket](const boost::system::error_code& error) {
         if (!running) return;
@@ -158,18 +155,14 @@ void ClientHandler::AcceptConnections() {
                     std::lock_guard<std::mutex> lock(clientSocketsMutex);
                     clientSockets.push_back(socket);
 
-                    #ifdef DEBUG
-                        std::cout << "Accepted connection" << std::endl;
-                    #endif
+                    ClientServiceLink::Log("Client connected", 1);
                 } else {
-                    std::cerr << "Handshake failed: " << error.message() << std::endl;
-                    ClientServiceLink::SendData("LOG", 4, "Handshake failed: " + error.message());
+                    ClientServiceLink::Log("Handshake failed: " + error.message(), 2);
                 }
                 AcceptConnections();
             });
         } else {
-            std::cerr << "Accept failed: " << error.message() << std::endl;
-            ClientServiceLink::SendData("LOG", 4, "Accept failed: " + error.message());
+            ClientServiceLink::Log("Accept failed: " + error.message(), 2);
 
             AcceptConnections();
         }
@@ -241,8 +234,7 @@ void ClientHandler::RecieveData() {
                     } else {
                         unvSockLock.unlock();
                         Disconnect(socket, "Critical server error: Could not find client socket");
-                        ClientServiceLink::SendData("LOG", 5, "Critical server error: Could not find client socket");
-                        std::cerr << "Critical server error: Could not find client socket" << std::endl;
+                        ClientServiceLink::Log("Critical server error: Could not find client socket", 4);
                         return;
                     }
                 }
@@ -250,9 +242,6 @@ void ClientHandler::RecieveData() {
 
                 std::lock_guard<std::mutex> lock(recieveBufferMutex);
                 recieveBuffer.push(data);
-                #ifdef DEBUG
-                    std::cout << "Received data from client: " << std::string(buffer->data(), bytes_transferred) << "\n";
-                #endif
             });
 
             ++it;
@@ -308,8 +297,7 @@ void ClientHandler::SendDataFromBuffer() {
                     #endif
                     boost::asio::async_write(*socket, boost::asio::buffer(data), [](const boost::system::error_code& error, std::size_t) {
                         if (error) {
-                            std::cerr << "Error sending data: " << error.message() << std::endl;
-                            ClientServiceLink::SendData("LOG", 4, "Error sending data: " + error.message());
+                            ClientServiceLink::Log("Send failed: " + error.message(), 3);
                         }
                     });
                 }
@@ -436,7 +424,7 @@ void ClientHandler::Disconnect(SOCKET socket, const std::string& reason) {
         }
     }
 
-    std::cout << "Disconnected client: " << reason << std::endl;
+    ClientServiceLink::Log("Client disconnected: " + reason, 1);
 }
 
 std::mutex& ClientHandler::GetSocketMutex(SOCKET socket) {
@@ -573,8 +561,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
                 return;
             } else if (uid < 0) {
                 Disconnect(socket, "Critical server error: Error during login");
-                std::cerr << "Error getting UID: " << uid << std::endl;
-                ClientServiceLink::SendData("LOG", 5, "Error getting UID: " + std::to_string(uid));
+                ClientServiceLink::Log("Critical server error: Error getting UID: " + std::to_string(uid), 4);
                 return;
             }
 
@@ -583,16 +570,14 @@ void ClientHandler::ProcessDataContent(std::string data) {
                 return;
             } else if (err != 1) {
                 Disconnect(socket, "Critical server error: Error during login");
-                std::cerr << "Error verifying password: " << err << std::endl;
-                ClientServiceLink::SendData("LOG", 5, "Error verifying password: " + std::to_string(err));
+                ClientServiceLink::Log("Critical server error: Error verifying password: " + std::to_string(err), 4);
                 return;
             }
 
             std::string email;
             if (err = Auth::GetEmail(uid, email), err != 1) {
                 Disconnect(socket, "Critical server error: Error during login");
-                std::cerr << "Error getting email: " << err << std::endl;
-                ClientServiceLink::SendData("LOG", 5, "Error getting email: " + std::to_string(err));
+                ClientServiceLink::Log("Critical server error: Error getting email: " + std::to_string(err), 4);
                 return;
             }
 
@@ -637,9 +622,8 @@ void ClientHandler::ProcessDataContent(std::string data) {
                 SendData(socket, "REGISTER", "USERNAME_EXISTS");
                 return;
             } else if (err != 0) {
-                ClientServiceLink::SendData("LOG", 5, "Error checking username: " + std::to_string(err));
                 Disconnect(socket, "Critical server error during registration");
-                std::cerr << "Error checking username: " << err << std::endl;
+                ClientServiceLink::Log("Critical server error: Error checking username: " + std::to_string(err), 4);
                 return;
             }
 
@@ -647,9 +631,8 @@ void ClientHandler::ProcessDataContent(std::string data) {
                 SendData(socket, "REGISTER", "EMAIL_EXISTS");
                 return;
             } else if (err != 0) {
-                ClientServiceLink::SendData("LOG", 5, "Error checking email: " + std::to_string(err));
                 Disconnect(socket, "Critical server error during registration");
-                std::cerr << "Error checking email: " << err << std::endl;
+                ClientServiceLink::Log("Critical server error: Error checking email: " + std::to_string(err), 4);
                 return;
             }
             else if (err = TypeUtils::checkPassword(password), err == false) {
@@ -693,8 +676,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
                 return;
             } else if (uid < 0) {
                 Disconnect(socket, "Critical server error: Error during login");
-                std::cerr << "Error getting UID: " << uid << std::endl;
-                ClientServiceLink::SendData("LOG", 5, "Error getting UID: " + std::to_string(uid));
+                ClientServiceLink::Log("Critical server error: Error getting UID: " + std::to_string(uid), 4);
                 return;
             }
 
@@ -781,16 +763,14 @@ void ClientHandler::ProcessDataContent(std::string data) {
             return;
         } else {
             Disconnect(socket, "Critical server error during registration");
-            std::cerr << "Error registering user: " << err << std::endl;
-            ClientServiceLink::SendData("LOG", 5, "Error registering user: " + std::to_string(err));
+            ClientServiceLink::Log("Critical server error: Error registering user: " + std::to_string(err), 4);
             return;
         }
 
         long oldUID = uid;
         if (uid = Auth::GetUID(user.username), uid < 1) {
             Disconnect(socket, "Critical server error during registration");
-            std::cerr << "Error getting UID: " << uid << std::endl;
-            ClientServiceLink::SendData("LOG", 5, "Error getting UID: " + std::to_string(uid));
+            ClientServiceLink::Log("Critical server error: Error getting UID: " + std::to_string(uid), 4);
             return;
         }
         AddClient(uid, socket);
@@ -871,8 +851,7 @@ void ClientHandler::ProcessDataContent(std::string data) {
             return;
         } else {
             Disconnect(socket, "Critical server error during password change");
-            std::cerr << "Error changing password: " << err << std::endl;
-            ClientServiceLink::SendData("LOG", 5, "Error changing password: " + std::to_string(err));
+            ClientServiceLink::Log("Critical server error: Error changing password: " + std::to_string(err), 4);
             return;
         }
 

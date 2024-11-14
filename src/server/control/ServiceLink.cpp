@@ -15,7 +15,6 @@
 #endif
 #include <thread>
 #include <chrono>
-#include <iostream>
 #include <unistd.h>
 
 std::mutex ServiceLink::connectionMutex;
@@ -28,6 +27,12 @@ std::mutex ServiceLink::bufferMutex;
 std::array<std::vector<std::string>, MAX_CONNECTIONS> ServiceLink::sendBuffer;
 std::mutex ServiceLink::sendBufferMutex;
 
+std::unordered_map<short, std::string> ServiceLink::serviceNames = {
+    {0, "Voice"},
+    {1, "Chat"},
+    {2, "World"},
+    {3, "Auth"}
+};
 
 bool ServiceLink::SendDataFromBuffer(int serviceId, const std::string& message) {
     int socket;
@@ -108,7 +113,7 @@ void ServiceLink::HandleConnection(int socket) {
                 std::lock_guard<std::mutex> lock(socketMutex);
                 if (serviceSockets[serviceId] > 0) {
                     validConnection = false;
-                    std::cerr << "Service " + std::to_string(serviceId) + " already connected" << std::endl;
+                    Log::Print("Service " + serviceNames[serviceId] + " already connected", 4);
                     return;
                 }
             }
@@ -267,7 +272,7 @@ void ServiceLink::HandleMessageContent(Message msg) {
         std::lock_guard<std::mutex> lock(socketMutex);
         serviceSockets[serviceId] = stoi(TypeUtils::getFirstParam(content));
 
-        if (serviceId == 3) { // Auth service
+        if (serviceNames[serviceId] == "Auth") {
             std::string dbConnString = "host=" + settings.dbhostaddr + 
                                        " port=" + std::to_string(settings.dbport) + 
                                        " dbname=" + settings.dbname + 
@@ -286,6 +291,11 @@ void ServiceLink::HandleMessageContent(Message msg) {
         Log::Print("Service " + std::to_string(serviceId) + " disconnected", 2);
         std::lock_guard<std::mutex> lock(socketMutex);
         serviceSockets[serviceId] = -1;
+
+    } else if (action == "LOG") {
+        std::string log = TypeUtils::getFirstParam(content);
+        int level = stoi(TypeUtils::getFirstParam(content));
+        Log::Print("["+serviceNames[serviceId]+"] " + log, level);
 
     } else {
         Log::Print("Unknown action: " + action, 3);

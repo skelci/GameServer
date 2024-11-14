@@ -235,6 +235,11 @@ void ClientServiceLink::ProcessMessages() {
     }
 }
 
+void ClientServiceLink::Log(const std::string& message, const short level) {
+    if (level > 0) std::cout << message << std::endl;
+    ClientServiceLink::SendData("LOG", level, message);
+}
+
 void ClientServiceLink::SetMessageHandler(std::function<void(const std::string&)> handler) {
     messageHandler = handler;
 }

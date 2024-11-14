@@ -28,7 +28,6 @@ struct Config {
     int loginAttempts = 3;
     int loginTime = 5;
     int emailVerificationTime = 3;
-
 };
 
 class AdvancedSettingsManager {

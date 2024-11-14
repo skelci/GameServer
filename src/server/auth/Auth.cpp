@@ -2,8 +2,8 @@
 
 #include "Settings.hpp"
 #include "common/TypeUtils.hpp"
+#include "shared/ClientServiceLink.hpp"
 
-#include <iostream>
 #include <stdexcept>
 
 std::atomic<std::shared_ptr<pqxx::connection>> Auth::c;
@@ -40,7 +40,7 @@ short Auth::RegisterUser(const std::string& username, const std::string& passwor
     try {
         auto conn = c.load();
         if (!conn) {
-            std::cerr << "Database connection is not open" << std::endl;
+            ClientServiceLink::Log("Database connection is not open", 4);
             return -10;
         }
 
@@ -60,7 +60,7 @@ short Auth::RegisterUser(const std::string& username, const std::string& passwor
 
         return 1;
     } catch (const std::exception& e) {
-        std::cerr << "Error registering user: " << e.what() << std::endl;
+        ClientServiceLink::Log("Error registering user: " + std::string(e.what()), 4);
         return -9;
     }
 }
@@ -70,7 +70,7 @@ short Auth::ChangePassword(int uid, const std::string& oldPassword, const std::s
     try {
         auto conn = c.load();
         if (!conn) {
-            std::cerr << "Database connection is not open" << std::endl;
+            ClientServiceLink::Log("Database connection is not open", 4);
             return -10;
         }
 
@@ -94,7 +94,7 @@ short Auth::ChangePassword(int uid, const std::string& oldPassword, const std::s
 
         return 1;
     } catch (const std::exception& e) {
-        std::cerr << "Error changing password: " << e.what() << std::endl;
+        ClientServiceLink::Log("Error changing password: " + std::string(e.what()), 4);
         return -9;
     }
 }
@@ -104,7 +104,7 @@ short Auth::VerifyPassword(int uid, const std::string& password) {
     try {
         auto conn = c.load();
         if (!conn) {
-            std::cerr << "Database connection is not open" << std::endl;
+            ClientServiceLink::Log("Database connection is not open", 4);
             return -10;
         }
 
@@ -126,7 +126,7 @@ short Auth::VerifyPassword(int uid, const std::string& password) {
         if (storedHash == computedHash) return 1;
         else return 0;
     } catch (const std::exception& e) {
-        std::cerr << "Error verifying password: " << e.what() << std::endl;
+        ClientServiceLink::Log("Error verifying password: " + std::string(e.what()), 4);
         return -9;
     }
 }
@@ -136,7 +136,7 @@ short Auth::CheckUsername(const std::string& username) {
     try {
         auto conn = c.load();
         if (!conn) {
-            std::cerr << "Database connection is not open" << std::endl;
+            ClientServiceLink::Log("Database connection is not open", 4);
             return -10;
         }
 
@@ -152,7 +152,7 @@ short Auth::CheckUsername(const std::string& username) {
             return 0; // Username does not exist
         }
     } catch (const std::exception& e) {
-        std::cerr << "Error checking username: " << e.what() << std::endl;
+        ClientServiceLink::Log("Error checking username: " + std::string(e.what()), 4);
         return -9;
     }
 }
@@ -162,7 +162,7 @@ short Auth::CheckEmail(const std::string& email) {
     try {
         auto conn = c.load();
         if (!conn) {
-            std::cerr << "Database connection is not open" << std::endl;
+            ClientServiceLink::Log("Database connection is not open", 4);
             return -10;
         }
 
@@ -178,7 +178,7 @@ short Auth::CheckEmail(const std::string& email) {
             return 0; // Email does not exist
         }
     } catch (const std::exception& e) {
-        std::cerr << "Error checking email: " << e.what() << std::endl;
+        ClientServiceLink::Log("Error checking email: " + std::string(e.what()), 4);
         return -9;
     }
 }
@@ -188,7 +188,7 @@ std::string Auth::CreateReloginToken(int uid) {
     try {
         auto conn = c.load();
         if (!conn) {
-            std::cerr << "Database connection is not open" << std::endl;
+            ClientServiceLink::Log("Database connection is not open", 4);
             return "";
         }
 
@@ -212,7 +212,7 @@ std::string Auth::CreateReloginToken(int uid) {
 
         return reloginToken;
     } catch (const std::exception& e) {
-        std::cerr << "Error creating relogin token: " << e.what() << std::endl;
+        ClientServiceLink::Log("Error creating relogin token: " + std::string(e.what()), 4);
         return "";
     }
 }
@@ -222,7 +222,7 @@ short Auth::VerifyReloginToken(int uid, const std::string& token) {
     try {
         auto conn = c.load();
         if (!conn) {
-            std::cerr << "Database connection is not open" << std::endl;
+            ClientServiceLink::Log("Database connection is not open", 4);
             return -10;
         }
 
@@ -244,7 +244,7 @@ short Auth::VerifyReloginToken(int uid, const std::string& token) {
         if (storedHash == computedHash) return 1;
         else return 0;
     } catch (const std::exception& e) {
-        std::cerr << "Error verifying relogin token: " << e.what() << std::endl;
+        ClientServiceLink::Log("Error verifying relogin token: " + std::string(e.what()), 4);
         return -9;
     }
 }
@@ -254,7 +254,7 @@ int Auth::GetUID(const std::string& username) {
     try {
         auto conn = c.load();
         if (!conn) {
-            std::cerr << "Database connection is not open" << std::endl;
+            ClientServiceLink::Log("Database connection is not open", 4);
             return -10;
         }
 
@@ -270,7 +270,7 @@ int Auth::GetUID(const std::string& username) {
 
         return result[0]["uid"].as<int>();
     } catch (const std::exception& e) {
-        std::cerr << "[Auth.cpp:309] Error getting UID: " << e.what() << std::endl;
+        ClientServiceLink::Log("Error getting UID: " + std::string(e.what()), 4);
         return -9;
     }
 }
@@ -280,7 +280,7 @@ short Auth::GetEmail(int uid, std::string& email) {
     try {
         auto conn = c.load();
         if (!conn) {
-            std::cerr << "Database connection is not open" << std::endl;
+            ClientServiceLink::Log("Database connection is not open", 4);
             return -10;
         }
 
@@ -297,7 +297,7 @@ short Auth::GetEmail(int uid, std::string& email) {
         email = result[0]["email"].as<std::string>();
         return 1;
     } catch (const std::exception& e) {
-        std::cerr << "Error getting email: " << e.what() << std::endl;
+        ClientServiceLink::Log("Error getting email: " + std::string(e.what()), 4);
         return -9;
     }
 }

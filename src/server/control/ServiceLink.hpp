@@ -4,6 +4,7 @@
 #include <mutex>
 #include <vector>
 #include <string>
+#include <unordered_map>
 #include <condition_variable>
 
 #include "common/TypeUtils.hpp"
@@ -31,6 +32,8 @@ private:
 	static void HandleConnection(int socket);
 	static void HandleMessageContent(Message msg);
 	static bool SendDataFromBuffer(int serviceId, const std::string& message);
+
+	static std::unordered_map<short, std::string> serviceNames;
 
 	static std::mutex connectionMutex;
 	static std::condition_variable connectionCond;

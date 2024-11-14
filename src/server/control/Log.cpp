@@ -6,7 +6,6 @@
 
 #include <ctime>
 #include <vector>
-#include <iostream>
 
 std::unique_ptr<pqxx::connection> Log::c;
 int Log::logLevel;

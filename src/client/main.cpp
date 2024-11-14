@@ -123,8 +123,8 @@ void RunTests(int threads){
 
 int main(){
 
-    // networkTemp();
-    RunTests(1000);
+    networkTemp();
+    // RunTests(1000);
 
     return 0;
 }

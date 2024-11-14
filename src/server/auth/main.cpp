@@ -1,12 +1,15 @@
-#include "shared/ClientServiceLink.hpp"
+#include "defines.hpp"
+#include "Settings.hpp"
 #include "ClientHandler.hpp"
 #include "messageHandler.hpp"
-#include "Settings.hpp"
-#include "defines.hpp"
+#include "shared/ClientServiceLink.hpp"
 
 #include <thread>
 #include <chrono>
-#include <iostream>
+
+#ifdef DEBUG
+    #include <iostream>
+#endif
 
 
 int main() {
@@ -15,7 +18,7 @@ int main() {
 
     while (!allSettingsReceived()) std::this_thread::sleep_for(std::chrono::milliseconds(100));
     
-    std::cout << "All settings received." << std::endl;
+    ClientServiceLink::Log("All settings received", 1);
 
     ClientHandler::Init(settings.port);
     ClientHandler::Start();
@@ -28,6 +31,8 @@ int main() {
 
     connectionThread.join();
 
-    std::cerr << "Exiting main" << std::endl;
+    #ifdef DEBUG
+        std::cerr << "Exiting main" << std::endl;
+    #endif
     return 0;
 }

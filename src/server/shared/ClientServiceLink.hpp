@@ -19,6 +19,8 @@ public:
     template<typename... Args>
     static void SendData(const Args&... args);
 
+    static void Log(const std::string& message, const short level = 0);
+
     static std::atomic<bool> running;
     
 private:

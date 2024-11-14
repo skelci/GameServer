@@ -1,7 +1,7 @@
 #include "AdvancedSettingsManager.hpp"
 
-#include "AdminConsole.hpp"
 #include "Log.hpp"
+#include "AdminConsole.hpp"
 
 #include <jsoncpp/json/json.h>
 
