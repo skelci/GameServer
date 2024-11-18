@@ -4,7 +4,7 @@
 
 #include <array>
 #include <mutex>
-#include <vector>
+#include <queue>
 #include <string>
 #include <unordered_map>
 #include <condition_variable>
@@ -41,9 +41,9 @@ private:
 
 	static std::array<int, MAX_CONNECTIONS> serviceSockets;
 	static std::mutex socketMutex;
-	static std::vector<Message> messageBuffer;
+	static std::queue<Message> messageBuffer;
 	static std::mutex bufferMutex;
-	static std::array<std::vector<std::string>, MAX_CONNECTIONS> sendBuffer;
+	static std::array<std::queue<std::string>, MAX_CONNECTIONS> sendBuffer;
 	static std::mutex sendBufferMutex;
 };
 
@@ -53,5 +53,5 @@ template<typename... Args>
 void ServiceLink::SendData(int serviceId, const Args&... args) {
     std::string msg = TypeUtils::stickParams(args..., (char)4);
     std::lock_guard<std::mutex> lock(sendBufferMutex);
-    sendBuffer[serviceId].push_back(msg);
+    sendBuffer[serviceId].push(msg);
 }

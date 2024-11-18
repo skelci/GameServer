@@ -22,9 +22,9 @@ std::condition_variable ServiceLink::connectionCond;
 int ServiceLink::activeConnections = 0;
 std::array<int, MAX_CONNECTIONS> ServiceLink::serviceSockets = {-1, -1, -1, -1};
 std::mutex ServiceLink::socketMutex;
-std::vector<Message> ServiceLink::messageBuffer;
+std::queue<Message> ServiceLink::messageBuffer;
 std::mutex ServiceLink::bufferMutex;
-std::array<std::vector<std::string>, MAX_CONNECTIONS> ServiceLink::sendBuffer;
+std::array<std::queue<std::string>, MAX_CONNECTIONS> ServiceLink::sendBuffer;
 std::mutex ServiceLink::sendBufferMutex;
 
 std::unordered_map<short, std::string> ServiceLink::serviceNames = {
@@ -70,7 +70,8 @@ void ServiceLink::ProcessSendBuffer() {
             if (auto socket = serviceSockets[i] > 0 && !sendBuffer[i].empty()) {
                 socketLock.unlock();
                 if (socket == -1) {
-                    sendBuffer[i].clear();
+                    std::queue<std::string> emptyQueue;
+                    std::swap(sendBuffer[i], emptyQueue);
                 } else {
                     wasNewMessage = true;
                     std::string message = sendBuffer[i].front();
@@ -78,7 +79,7 @@ void ServiceLink::ProcessSendBuffer() {
 
                     if (SendDataFromBuffer(i, message)) {
                         bufferLock.lock();
-                        sendBuffer[i].erase(sendBuffer[i].begin());
+                        sendBuffer[i].pop();
                     }
                 }
             }
@@ -135,14 +136,14 @@ void ServiceLink::HandleConnection(int socket) {
 
             {
                 std::lock_guard<std::mutex> bufferLock(bufferMutex);
-                messageBuffer.push_back({serviceId, receivedMessage});
+                messageBuffer.push({serviceId, receivedMessage});
             }
         }
     }
 
     if ((serviceId != -1) == validConnection) {
         std::lock_guard<std::mutex> bufferLock(bufferMutex);
-        messageBuffer.push_back({serviceId, "DISCONNECT"});
+        messageBuffer.push({serviceId, "DISCONNECT"});
     }
     {
         std::lock_guard<std::mutex> lock(connectionMutex);
@@ -261,7 +262,7 @@ void ServiceLink::ProcessMessages() {
         messageBufferEmpty = messageBuffer.empty();
         if (!messageBufferEmpty) {
             Message msg = messageBuffer.front();
-            messageBuffer.erase(messageBuffer.begin());
+            messageBuffer.pop();
             lock.unlock();
 
             HandleMessageContent(msg);
