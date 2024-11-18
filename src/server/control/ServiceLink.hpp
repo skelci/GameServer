@@ -1,13 +1,13 @@
 #pragma once
 
+#include "common/TypeUtils.hpp"
+
 #include <array>
 #include <mutex>
 #include <vector>
 #include <string>
 #include <unordered_map>
 #include <condition_variable>
-
-#include "common/TypeUtils.hpp"
 
 #define MAX_CONNECTIONS 4
 

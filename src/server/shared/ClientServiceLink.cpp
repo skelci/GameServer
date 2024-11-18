@@ -154,6 +154,7 @@ void ClientServiceLink::ProcessSendBuffer() {
         }
         std::unique_lock<std::mutex> bufferLock(sendBufferMutex);
         if (!sendBuffer.empty() && sock_ > 0) {
+std::cerr << "Sent message0: " << std::endl;
             std::string message = sendBuffer.front();
             bufferLock.unlock();
             if (SendDataFromBuffer(message)) {
@@ -164,7 +165,7 @@ void ClientServiceLink::ProcessSendBuffer() {
 
         } else {
             bufferLock.unlock();
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     }
 }
@@ -185,6 +186,7 @@ bool ClientServiceLink::SendDataFromBuffer(const std::string& message) {
         std::cerr << "Failed to send message to the service.\n";
         return false;
     }
+std::cerr << "Sent message: " << message << std::endl;
     return true;
 }
 

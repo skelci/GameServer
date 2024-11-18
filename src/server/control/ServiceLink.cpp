@@ -20,7 +20,7 @@
 std::mutex ServiceLink::connectionMutex;
 std::condition_variable ServiceLink::connectionCond;
 int ServiceLink::activeConnections = 0;
-std::array<int, MAX_CONNECTIONS> ServiceLink::serviceSockets;
+std::array<int, MAX_CONNECTIONS> ServiceLink::serviceSockets = {-1, -1, -1, -1};
 std::mutex ServiceLink::socketMutex;
 std::vector<Message> ServiceLink::messageBuffer;
 std::mutex ServiceLink::bufferMutex;
@@ -109,17 +109,17 @@ void ServiceLink::HandleConnection(int socket) {
 
             serviceId = stoi(TypeUtils::getFirstParam(receivedMessage));
 
-            {
-                std::lock_guard<std::mutex> lock(socketMutex);
-                if (serviceSockets[serviceId] > 0) {
-                    validConnection = false;
-                    Log::Print("Service " + serviceNames[serviceId] + " already connected", 4);
-                    return;
-                }
-            }
-
             if (receivedMessage == "CONNECT\036") {
                 receivedMessage += std::to_string(socket);
+
+                {
+                    std::lock_guard<std::mutex> lock(socketMutex);
+                    if (serviceSockets[serviceId] > 0) {
+                        validConnection = false;
+                        Log::Print("Service " + serviceNames[serviceId] + " already connected", 4);
+                        return;
+                    }
+                }
             }
 
             {
@@ -293,8 +293,8 @@ void ServiceLink::HandleMessageContent(Message msg) {
         serviceSockets[serviceId] = -1;
 
     } else if (action == "LOG") {
-        std::string log = TypeUtils::getFirstParam(content);
         int level = stoi(TypeUtils::getFirstParam(content));
+        std::string log = TypeUtils::getFirstParam(content);
         Log::Print("["+serviceNames[serviceId]+"] " + log, level);
 
     } else {
