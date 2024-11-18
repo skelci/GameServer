@@ -54,26 +54,37 @@ bool ServiceLink::SendDataFromBuffer(int serviceId, const std::string& message) 
 
 void ServiceLink::ProcessSendBuffer() {
     bool isBufferEmpty = false;
-    while (AdminConsole::isRunning || !isBufferEmpty) {
-        bool wasNewMessage = false;
-        std::unique_lock<std::mutex> bufferLock(sendBufferMutex);
-        for (int i = 0; i < MAX_CONNECTIONS; i++) {
-            std::unique_lock<std::mutex> socketLock(socketMutex);
-            if (!sendBuffer[i].empty() && serviceSockets[i] > 0) {
-                socketLock.unlock();
-                wasNewMessage = true;
-                std::string message = sendBuffer[i].front();
-                bufferLock.unlock();
-
-                if (SendDataFromBuffer(i, message)) {
-                    bufferLock.lock();
-                    sendBuffer[i].erase(sendBuffer[i].begin());
-                    bufferLock.unlock();
-                }
+    while (true) {
+        {
+            std::lock_guard<std::mutex> lock(connectionMutex);
+            if (!AdminConsole::isRunning && (activeConnections == 0 || isBufferEmpty)) {
+                break;
             }
         }
-        if (!wasNewMessage) {
+        bool wasNewMessage = false;
+        std::unique_lock<std::mutex> bufferLock(sendBufferMutex);
+        bufferLock.unlock();
+        for (int i = 0; i < MAX_CONNECTIONS; i++) {
+            std::unique_lock<std::mutex> socketLock(socketMutex);
+            bufferLock.lock();
+            if (auto socket = serviceSockets[i] > 0 && !sendBuffer[i].empty()) {
+                socketLock.unlock();
+                if (socket == -1) {
+                    sendBuffer[i].clear();
+                } else {
+                    wasNewMessage = true;
+                    std::string message = sendBuffer[i].front();
+                    bufferLock.unlock();
+
+                    if (SendDataFromBuffer(i, message)) {
+                        bufferLock.lock();
+                        sendBuffer[i].erase(sendBuffer[i].begin());
+                    }
+                }
+            }
             bufferLock.unlock();
+        }
+        if (!wasNewMessage) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             bufferLock.lock();
             isBufferEmpty = sendBuffer[0].empty() && sendBuffer[1].empty() && sendBuffer[2].empty() && sendBuffer[3].empty();
