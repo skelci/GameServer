@@ -34,7 +34,9 @@ void AdvancedSettingsManager::LoadSettings(const std::string& file_) {
         &config.emailVerificationsAttempts,
         &config.loginAttempts,
         &config.loginTime,
-        &config.emailVerificationTime
+        &config.emailVerificationTime,
+
+        &config.worldServicePort
     };
 
     std::lock_guard<std::mutex> lock(mutex);
@@ -97,6 +99,10 @@ void AdvancedSettingsManager::LoadSettings(const std::string& file_) {
         if (root.isMember("emailVerificationTime")) {
             config.emailVerificationTime = root["emailVerificationTime"].asInt();
         }
+
+        if (root.isMember("worldServicePort")) {
+            config.worldServicePort = root["worldServicePort"].asInt();
+        }
     }
 }
 
@@ -124,6 +130,8 @@ void AdvancedSettingsManager::SaveSettings() {
     root["loginAttempts"] = config.loginAttempts;
     root["loginTime"] = config.loginTime;
     root["emailVerificationTime"] = config.emailVerificationTime;
+
+    root["worldServicePort"] = config.worldServicePort;
 
     std::ofstream configFile(file, std::ofstream::binary);
     configFile << root;
@@ -156,7 +164,9 @@ void AdvancedSettingsManager::SetSettings(
     std::optional<int> emailVerificationsAttempts,
     std::optional<int> loginAttempts,
     std::optional<int> loginTime,
-    std::optional<int> emailVerificationTime
+    std::optional<int> emailVerificationTime,
+
+    std::optional<int> worldServicePort
 ) {
 
     std::lock_guard<std::mutex> lock(mutex);
@@ -208,6 +218,9 @@ void AdvancedSettingsManager::SetSettings(
     }
     if (emailVerificationTime.has_value()) {
         config.emailVerificationTime = emailVerificationTime.value();
+    }
+    if (worldServicePort.has_value()) {
+        config.worldServicePort = worldServicePort.value();
     }
 }
 

@@ -14,5 +14,6 @@
 	"logLevel" : 5,
 	"loginAttempts" : 3,
 	"loginTime" : 5,
-	"maxLogBufferSize" : 16
+	"maxLogBufferSize" : 16,
+	"worldServicePort" : 8082
 }

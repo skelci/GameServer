@@ -98,6 +98,8 @@ void AdminConsole::AddCommands() {
         "loginattempts",
         "logintime",
         "emailverificationtime"
+
+        "worldserviceport"
     };
     secParam[2] = {"all", "setting", "logs"};
 }
@@ -569,7 +571,7 @@ void AdminConsole::ProcessLine(const std::string& line) {
             CmdReport("Invalid argument for config command. Argument should be type int", 4);
             return;
         }
-        if ((index == 1 || index == 8 || index == 11) && (value < 1 || value > 65535)) {
+        if ((index == 1 || index == 8 || index == 11 || index == 15) && (value < 1 || value > 65535)) {
             CmdReport("Port must be greater than 0 and smaller than 65536", 4);
         } else if ((index == 0 || index == 3 || index == 10 || (index >= 12 && index <= 15)) && value < 0) {
             CmdReport("This value must be greater or equal to 0", 4);
@@ -629,7 +631,7 @@ void AdminConsole::Stop(double waitTime) {
 
     //TODO ServiceLink::SendData(0, "SHUTTING_DOWN");
     //TODO ServiceLink::SendData(1, "SHUTTING_DOWN");
-    //TODO ServiceLink::SendData(2, "SHUTTING_DOWN");
+    ServiceLink::SendData(2, "SHUTTING_DOWN");
     ServiceLink::SendData(3, "SHUTTING_DOWN");
 
     ServiceLink::NotifyConnection();
@@ -643,7 +645,7 @@ void AdminConsole::Stop(double waitTime) {
 
         //TODO ServiceLink::SendData(0, "SHUTDOWN");
         //TODO ServiceLink::SendData(1, "SHUTDOWN");
-        //TODO ServiceLink::SendData(2, "SHUTDOWN");
+        ServiceLink::SendData(2, "SHUTDOWN");
         ServiceLink::SendData(3, "SHUTDOWN");
         
         isRunning = false;

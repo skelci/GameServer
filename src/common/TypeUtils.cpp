@@ -81,6 +81,11 @@ bool tryPassUInt(const std::string& s, unsigned int& i) {
     return ec == std::errc() && ptr == s.data() + s.size();
 }
 
+bool tryPassULong(const std::string& s, unsigned long& i) {
+    auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), i);
+    return ec == std::errc() && ptr == s.data() + s.size();
+}
+
 bool isValidString(const std::string& str) {
     for (char c : str) {
         if (!std::isprint(static_cast<unsigned char>(c))) {

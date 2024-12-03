@@ -28,6 +28,25 @@ void networkTemp(){
     }
 
     client.Stop();
+
+    NetworkClient client2(server, 8082);
+
+    client2.Start();
+
+    while (true) {
+        std::string data;
+        std::getline(std::cin, data);
+
+        std::replace(data.begin(), data.end(), ' ', (char)30);
+
+        if (data == "exit") {
+            break;
+        }
+
+        client2.SendMessage(data);
+    }
+
+    client2.Stop();
 }
 
 void testNetworkClient() {
