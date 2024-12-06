@@ -178,8 +178,8 @@ if(BUILD_SERVER_AUTH)
             boost_thread
             crypto
             common
-            ssl
             pqxx
+            ssl
         )
     endif()
 endif()
@@ -190,11 +190,18 @@ if(BUILD_SERVER_WORLD)
 
     if(WIN32)
         target_link_libraries(serverworld PUBLIC
+            ${BOOST_SYSTEM}
+            ${BOOST_THREAD}
             servershared
+            mswsock
+            common
         )
     else()
         target_link_libraries(serverworld PUBLIC
             servershared
+            boost_system
+            boost_thread
+            common
         )
     endif()
 endif()

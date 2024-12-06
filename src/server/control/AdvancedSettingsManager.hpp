@@ -28,6 +28,8 @@ struct Config {
     int loginAttempts = 3;
     int loginTime = 5;
     int emailVerificationTime = 3;
+
+    int worldServicePort = 8082;
 };
 
 class AdvancedSettingsManager {
@@ -55,7 +57,9 @@ public:
         std::optional<int> emailVerificationsAttempts = std::nullopt,
         std::optional<int> loginAttempts = std::nullopt,
         std::optional<int> loginTime = std::nullopt,
-        std::optional<int> emailVerificationTime = std::nullopt
+        std::optional<int> emailVerificationTime = std::nullopt,
+
+        std::optional<int> worldServicePort = std::nullopt
     );
     static void SetSetting(size_t index, const std::variant<int, std::string>& value);
     static std::string GetSetting(size_t index);

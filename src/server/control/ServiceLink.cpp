@@ -34,6 +34,13 @@ std::unordered_map<short, std::string> ServiceLink::serviceNames = {
     {3, "Auth"}
 };
 
+std::unordered_map<std::string, short> ServiceLink::serviceIds = {
+    {"Voice", 0},
+    {"Chat", 1},
+    {"World", 2},
+    {"Auth", 3}
+};
+
 bool ServiceLink::SendDataFromBuffer(int serviceId, const std::string& message) {
     int socket;
     {
@@ -297,6 +304,8 @@ void ServiceLink::HandleMessageContent(Message msg) {
             SendData(serviceId, "SETTING_SET_loginAttempts", std::to_string(settings.loginAttempts));
             SendData(serviceId, "SETTING_SET_loginTime", std::to_string(settings.loginTime));
             SendData(serviceId, "SETTING_SET_emailVerificationTime", std::to_string(settings.emailVerificationTime));
+        } else if (serviceNames[serviceId] == "World") {
+            SendData(serviceId, "SETTING_SET_port", std::to_string(settings.worldServicePort));
         }
 
     } else if (action == "DISCONNECT") {
@@ -309,7 +318,10 @@ void ServiceLink::HandleMessageContent(Message msg) {
         std::string log = TypeUtils::getFirstParam(content);
         Log::Print("["+serviceNames[serviceId]+"] " + log, level);
 
+    } else if (action == "LOGIN") {
+        SendData(serviceIds["World"], "LOGIN", content);
+
     } else {
-        Log::Print("Unknown action: " + action, 3);
+        Log::Print("Unknown action: " + action, 4);
     }
 }
